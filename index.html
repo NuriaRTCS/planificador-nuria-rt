@@ -1089,105 +1089,61 @@
       return [...upcoming, ...past];
     }
 
-    // --- CLOUD SYNC ENGINE (JSONBin.io v3 — FREE, no account needed for public bins) ---
-    // Uses a public JSONBin per PIN. The bin ID is stored in localStorage so all
-    // devices that share the same PIN always read/write the same remote record.
-    // Flow:
-    //   1st push  → POST  → creates the bin, stores its ID in localStorage
-    //   subsequent → PUT  → overwrites the same bin
-    //   fetch      → GET  → reads the latest record
+    // --- CLOUD SYNC ENGINE — Firebase Realtime Database REST API ---
+    // Database: planificador-nuria-default-rtdb (Google Firebase, free tier)
+    // Rules: test mode (public read/write) — no auth required
+    // API: PUT /planificador/{pin}.json  → write
+    //      GET /planificador/{pin}.json  → read
 
-    const JSONBIN_API = 'https://api.jsonbin.io/v3/b';
-    // Public master key (read+write, no account). Rotate if abused.
-    const JSONBIN_MASTER_KEY = '$2a$10$wDf1OyTuLVuUXpQkAtgW5.KVAQMDpXiWzO/P6C4JhD6VgPrNh.Mpa';
+    const FIREBASE_DB = 'https://planificador-nuria-default-rtdb.firebaseio.com';
 
     async function autoPushToCloud(pin, dataObj) {
       if (!pin || typeof pin !== 'string') return;
-      const cleanPin = pin.trim();
+      const cleanPin = pin.trim().replace(/[^a-zA-Z0-9]/g, '_');
       if (cleanPin.length < 4) return;
 
-      const payloadStr = JSON.stringify({ ...dataObj, _lastUpdated: Date.now() });
+      const payload = { ...dataObj, _lastUpdated: Date.now() };
+      const payloadStr = JSON.stringify(payload);
 
-      // Always save locally first
+      // 1. Save locally
+      try { localStorage.setItem('planificador_docente_nuria_rt_2026_2027', payloadStr); } catch(e) {}
+
+      // 2. Push to Firebase
       try {
-        localStorage.setItem('planificador_docente_nuria_rt_2026_2027', payloadStr);
-      } catch (e) {}
-
-      const binKey = `planificador_bin_${cleanPin}`;
-      const binId  = localStorage.getItem(binKey);
-      const url    = binId ? `${JSONBIN_API}/${binId}` : JSONBIN_API;
-      const method = binId ? 'PUT' : 'POST';
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_MASTER_KEY
-      };
-      if (!binId) {
-        headers['X-Bin-Name']     = `planificador_nuria_${cleanPin}`;
-        headers['X-Bin-Private']  = 'false';
-      }
-
-      try {
-        const res = await fetch(url, { method, headers, body: payloadStr });
-        if (res.ok) {
-          const resData = await res.json();
-          const newId = resData.metadata?.id || binId;
-          if (newId && newId !== binId) localStorage.setItem(binKey, newId);
-        }
-      } catch (e) {
-        console.warn('Cloud push error:', e);
+        await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadStr
+        });
+      } catch(e) {
+        console.warn('Firebase push error:', e);
       }
     }
 
     async function autoFetchFromCloud(pin, onNewData) {
       if (!pin || typeof pin !== 'string') return false;
-      const cleanPin = pin.trim();
+      const cleanPin = pin.trim().replace(/[^a-zA-Z0-9]/g, '_');
       if (cleanPin.length < 4) return false;
 
-      const applyIfNewer = (remoteData) => {
+      try {
+        const res = await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json?nocache=${Date.now()}`);
+        if (!res.ok) return false;
+        const remoteData = await res.json();
         if (!remoteData || typeof remoteData !== 'object') return false;
+
         const remoteTime = remoteData._lastUpdated || 0;
         let localTime = 0;
         try {
           const loc = localStorage.getItem('planificador_docente_nuria_rt_2026_2027');
-          if (loc) localTime = (JSON.parse(loc)._lastUpdated || 0);
+          if (loc) localTime = JSON.parse(loc)._lastUpdated || 0;
         } catch(e) {}
-        if (remoteTime > localTime + 500) { onNewData(remoteData); return true; }
-        return false;
-      };
 
-      const binKey = `planificador_bin_${cleanPin}`;
-      let binId  = localStorage.getItem(binKey);
-
-      // If this device doesn't know the bin yet, search by name
-      if (!binId) {
-        try {
-          const searchRes = await fetch(`${JSONBIN_API}?nocache=${Date.now()}`, {
-            headers: { 'X-Master-Key': JSONBIN_MASTER_KEY, 'X-Collection-Id': '' }
-          });
-          if (searchRes.ok) {
-            const bins = await searchRes.json();
-            const match = Array.isArray(bins) && bins.find(b => b.name === `planificador_nuria_${cleanPin}`);
-            if (match) {
-              binId = match.id;
-              localStorage.setItem(binKey, binId);
-            }
-          }
-        } catch(e) {}
-      }
-
-      if (!binId) return false;
-
-      try {
-        const res = await fetch(`${JSONBIN_API}/${binId}/latest?nocache=${Date.now()}`, {
-          headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json?.record && applyIfNewer(json.record)) return true;
+        if (remoteTime > localTime + 500) {
+          onNewData(remoteData);
+          return true;
         }
-      } catch (e) {
-        console.warn('Cloud fetch error:', e);
+      } catch(e) {
+        console.warn('Firebase fetch error:', e);
       }
       return false;
     }
