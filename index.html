@@ -1095,7 +1095,7 @@
     // API: PUT /planificador/{pin}.json  → write
     //      GET /planificador/{pin}.json  → read
 
-    const FIREBASE_DB = 'https://planificador-nuria-default-rtdb.firebaseio.com';
+    const FIREBASE_DB = 'https://planificador-nuria-default-rtdb.europe-west1.firebasedatabase.app';
 
     async function autoPushToCloud(pin, dataObj) {
       if (!pin || typeof pin !== 'string') return;
