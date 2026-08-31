@@ -603,28 +603,16 @@
     .rte-content u, .rte-editor u { text-decoration: underline; }
     .rte-content ul, .rte-editor ul { list-style-type: disc; padding-left: 1.75em; margin: 0.35em 0; }
     
-    /* CSS counter for ordered lists so hiding/deleting a number never breaks the sequence */
+    /* Native & explicit list resequencing using <li value="N"> */
     .rte-content ol, .rte-editor ol {
-      list-style-type: none;
-      counter-reset: rte-list-counter var(--ol-start, 0);
+      list-style-type: decimal;
       padding-left: 1.75em;
       margin: 0.35em 0;
     }
     .rte-content ol > li, .rte-editor ol > li {
-      counter-increment: rte-list-counter;
-      position: relative;
       margin: 0.25em 0;
     }
-    .rte-content ol > li[data-no-number="true"], .rte-editor ol > li[data-no-number="true"],
-    .rte-content ol > li.no-number, .rte-editor ol > li.no-number,
-    .rte-content ol > li[style*="list-style-type: none"], .rte-editor ol > li[style*="list-style-type: none"],
-    .rte-content ol > li[style*="list-style: none"], .rte-editor ol > li[style*="list-style: none"] {
-      counter-increment: none;
-    }
-    
-    /* Universal formatting inheritance (bold, italic, underline, color, font, size) for list numbers & bullets */
     .rte-content ol > li::marker, .rte-editor ol > li::marker {
-      content: counter(rte-list-counter) ". ";
       font-weight: inherit;
       font-style: inherit;
       font-family: inherit;
@@ -640,13 +628,11 @@
       color: inherit;
       text-decoration: inherit;
     }
-    
-    /* Hide marker on line without breaking counter for next items */
-    .rte-content ol > li[data-no-number="true"]::marker, .rte-editor ol > li[data-no-number="true"]::marker,
-    .rte-content ol > li.no-number::marker, .rte-editor ol > li.no-number::marker,
-    .rte-content ol > li[style*="list-style-type: none"]::marker, .rte-editor ol > li[style*="list-style-type: none"]::marker,
-    .rte-content ol > li[style*="list-style: none"]::marker, .rte-editor ol > li[style*="list-style: none"]::marker {
-      content: "";
+    .rte-content ol > li[data-no-number="true"], .rte-editor ol > li[data-no-number="true"],
+    .rte-content ol > li.no-number, .rte-editor ol > li.no-number,
+    .rte-content ol > li[style*="list-style-type: none"], .rte-editor ol > li[style*="list-style-type: none"],
+    .rte-content ol > li[style*="list-style: none"], .rte-editor ol > li[style*="list-style: none"] {
+      list-style-type: none !important;
     }
     
     .rte-content li:has(b)::marker, .rte-editor li:has(b)::marker,
@@ -3554,18 +3540,22 @@
         const div = document.createElement('div');
         div.innerHTML = htmlStr;
         const ols = div.querySelectorAll('ol');
-        let currentCount = 1;
         ols.forEach(ol => {
-          ol.setAttribute('start', currentCount);
-          ol.style.setProperty('--ol-start', currentCount - 1);
-          ol.style.counterReset = `rte-list-counter ${currentCount - 1}`;
+          let num = 1;
           const lis = ol.querySelectorAll(':scope > li');
           lis.forEach(li => {
             const isHidden = li.getAttribute('data-no-number') === 'true' || 
                              li.classList.contains('no-number') || 
                              (li.style.listStyleType && li.style.listStyleType.includes('none'));
-            if (!isHidden) {
-              currentCount++;
+            if (isHidden) {
+              li.setAttribute('data-no-number', 'true');
+              li.style.listStyleType = 'none';
+              li.removeAttribute('value');
+            } else {
+              li.removeAttribute('data-no-number');
+              li.style.listStyleType = 'decimal';
+              li.setAttribute('value', num);
+              num++;
             }
           });
         });
@@ -3607,18 +3597,22 @@
       const resequence = () => {
         if (!editorRef.current) return;
         const ols = editorRef.current.querySelectorAll('ol');
-        let currentCount = 1;
         ols.forEach(ol => {
-          ol.setAttribute('start', currentCount);
-          ol.style.setProperty('--ol-start', currentCount - 1);
-          ol.style.counterReset = `rte-list-counter ${currentCount - 1}`;
+          let num = 1;
           const lis = ol.querySelectorAll(':scope > li');
           lis.forEach(li => {
             const isHidden = li.getAttribute('data-no-number') === 'true' || 
                              li.classList.contains('no-number') || 
                              (li.style.listStyleType && li.style.listStyleType.includes('none'));
-            if (!isHidden) {
-              currentCount++;
+            if (isHidden) {
+              li.setAttribute('data-no-number', 'true');
+              li.style.listStyleType = 'none';
+              li.removeAttribute('value');
+            } else {
+              li.removeAttribute('data-no-number');
+              li.style.listStyleType = 'decimal';
+              li.setAttribute('value', num);
+              num++;
             }
           });
         });
