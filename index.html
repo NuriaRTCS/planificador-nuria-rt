@@ -583,6 +583,25 @@
     }
     textarea.form-control { min-height: 80px; resize: vertical; }
 
+    /* Rich Text Editor */
+    .rte-toolbar { display: flex; gap: 0.3rem; padding: 0.45rem 0.6rem; background: var(--bg-card-subtle); border: 1px solid var(--border-subtle); border-bottom: none; border-radius: var(--radius-sm) var(--radius-sm) 0 0; flex-wrap: wrap; align-items: center; }
+    .rte-sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 0.2rem; }
+    .rte-btn { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.2rem 0.55rem; cursor: pointer; font-size: 0.85rem; color: var(--text-primary); transition: background 0.15s, border-color 0.15s; line-height: 1.4; min-width: 28px; text-align: center; }
+    .rte-btn:hover { background: var(--gold-light); border-color: var(--gold-accent); color: var(--ink-blue); }
+    .rte-btn.active { background: var(--ink-blue); border-color: var(--ink-blue); color: #fff; }
+    .rte-btn-bold { font-weight: 700; }
+    .rte-btn-italic { font-style: italic; }
+    .rte-btn-underline { text-decoration: underline; }
+    .rte-select { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.18rem 0.35rem; font-size: 0.8rem; color: var(--text-primary); cursor: pointer; height: 26px; }
+    .rte-select:focus { outline: none; border-color: var(--gold-accent); }
+    .rte-color { width: 26px; height: 26px; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 1px; cursor: pointer; background: none; }
+    .rte-editor { min-height: 120px; padding: 0.65rem 0.85rem; border: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-sm) var(--radius-sm); background: #fff; font-size: 0.95rem; line-height: 1.6; color: var(--text-primary); outline: none; cursor: text; }
+    .rte-editor:empty:before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
+    .rte-editor:focus { border-color: var(--gold-accent); box-shadow: 0 0 0 3px rgba(196,154,69,0.12); }
+    .rte-content b, .rte-content strong { font-weight: 700; }
+    .rte-content i, .rte-content em { font-style: italic; }
+    .rte-content u { text-decoration: underline; }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -1059,6 +1078,94 @@
         cur.setDate(cur.getDate() + 1);
       }
       return count;
+    }
+
+    // --- DOCUMENT DOWNLOAD HELPERS ---
+    const DOC_STYLES = `
+      body { font-family: 'Georgia', serif; color: #1E293B; margin: 2cm; }
+      h1 { font-size: 22pt; color: #1E2E40; border-bottom: 2px solid #C49A45; padding-bottom: 6pt; margin-bottom: 12pt; }
+      h2 { font-size: 14pt; color: #7A2638; margin-top: 18pt; margin-bottom: 6pt; }
+      h3 { font-size: 12pt; color: #2E5A44; margin-top: 14pt; margin-bottom: 4pt; }
+      p, div { font-size: 11pt; line-height: 1.6; margin-bottom: 8pt; }
+      .meta { font-size: 9pt; color: #64748B; margin-bottom: 16pt; }
+      .section { border-left: 4px solid #C49A45; padding-left: 12pt; margin-bottom: 16pt; }
+      .footer { font-size: 8pt; color: #94A3B8; border-top: 1px solid #E2E8F0; margin-top: 24pt; padding-top: 6pt; }
+    `;
+
+    function downloadAsWord(title, sections) {
+      const body = sections.map(s =>
+        `<div class="section"><h2>${s.label}</h2><div>${s.content || '<em>Sin contenido</em>'}</div></div>`
+      ).join('');
+      const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
+        xmlns:w='urn:schemas-microsoft-com:office:word'
+        xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>${title}</title>
+        <style>${DOC_STYLES}</style></head>
+        <body>
+          <h1>${title}</h1>
+          <p class="meta">Planificador Docente — Nuria RT 2026/2027 &nbsp;|&nbsp; Generado: ${new Date().toLocaleDateString('es-ES')}</p>
+          ${body}
+          <div class="footer">Planificador Docente · Nuria RT · Curso 2026/2027</div>
+        </body></html>`;
+      const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${title.replace(/[^a-zA-Z0-9\u00C0-\u024F ]/g, '_')}.doc`;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    }
+
+    function downloadAsPDF(title, sections) {
+      const body = sections.map(s =>
+        `<div class="section"><h2>${s.label}</h2><div>${s.content || '<em>Sin contenido</em>'}</div></div>`
+      ).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset='utf-8'><title>${title}</title>
+        <style>
+          ${DOC_STYLES}
+          @page { margin: 2cm; }
+          @media print { body { margin: 0; } .no-print { display: none; } }
+        </style></head>
+        <body>
+          <h1>${title}</h1>
+          <p class="meta">Planificador Docente — Nuria RT 2026/2027 &nbsp;|&nbsp; Generado: ${new Date().toLocaleDateString('es-ES')}</p>
+          ${body}
+          <div class="footer">Planificador Docente · Nuria RT · Curso 2026/2027</div>
+          <script>window.onload = function(){ window.print(); window.onafterprint = function(){ window.close(); }; }<\/script>
+        </body></html>`;
+      const win = window.open('', '_blank');
+      if (win) { win.document.write(html); win.document.close(); }
+    }
+
+    // Shared download menu component
+    function DownloadMenu({ title, sections }) {
+      const [open, setOpen] = React.useState(false);
+      return h('div', { style: { position: 'relative', display: 'inline-block' } },
+        h('button', {
+          type: 'button',
+          onClick: e => { e.stopPropagation(); setOpen(v => !v); },
+          style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px' },
+          title: 'Descargar documento'
+        }, '⬇️ Descargar'),
+        open && h('div', {
+          style: { position: 'absolute', right: 0, top: '110%', zIndex: 200, background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 150, overflow: 'hidden' },
+          onClick: e => e.stopPropagation()
+        },
+          h('button', {
+            type: 'button',
+            onClick: () => { downloadAsPDF(title, sections); setOpen(false); },
+            style: { display: 'block', width: '100%', padding: '0.55rem 1rem', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-subtle)' },
+            onMouseEnter: e => e.target.style.background = 'var(--bg-card-subtle)',
+            onMouseLeave: e => e.target.style.background = 'none'
+          }, '📄 Descargar PDF'),
+          h('button', {
+            type: 'button',
+            onClick: () => { downloadAsWord(title, sections); setOpen(false); },
+            style: { display: 'block', width: '100%', padding: '0.55rem 1rem', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-primary)' },
+            onMouseEnter: e => e.target.style.background = 'var(--bg-card-subtle)',
+            onMouseLeave: e => e.target.style.background = 'none'
+          }, '📝 Descargar Word')
+        )
+      );
     }
 
     function getReorderedSchoolMonths() {
@@ -3171,11 +3278,9 @@
             ),
             h('div', null,
               h('label', { className: 'form-label' }, 'Observaciones Generales y Criterios del Grupo'),
-              h('textarea', {
-                className: 'form-control',
-                rows: 3,
+              h(RichTextEditor, {
                 value: activeGroup.notes || '',
-                onChange: e => handleUpdateGroupNotes(e.target.value),
+                onChange: html => handleUpdateGroupNotes(html),
                 placeholder: 'Añade anotaciones pedagógicas generales...'
               })
             )
@@ -3298,7 +3403,11 @@
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, 'Contenido / Observaciones'),
-                  h('textarea', { className: 'form-control', rows: 4, required: true, value: newObsContent, onChange: e => setNewObsContent(e.target.value), placeholder: 'Resumen de la sesión o notas del estudiante...' })
+                  h(RichTextEditor, {
+                    value: newObsContent,
+                    onChange: html => setNewObsContent(html),
+                    placeholder: 'Resumen de la sesión o notas del estudiante...'
+                  })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
                   h('input', { type: 'checkbox', id: 'chk_important_obs', checked: newObsImportant, onChange: e => setNewObsImportant(e.target.checked) }),
@@ -3315,6 +3424,107 @@
       );
     }
 
+    // --- RICH TEXT EDITOR COMPONENT ---
+    const RTE_FONTS = [
+      { label: 'Predeterminada', value: '' },
+      { label: 'Sans-Serif', value: 'Arial, sans-serif' },
+      { label: 'Serif', value: 'Georgia, serif' },
+      { label: 'Monoespaciada', value: 'Courier New, monospace' },
+      { label: 'Merriweather', value: 'Merriweather, serif' },
+      { label: 'Playfair Display', value: 'Playfair Display, serif' },
+    ];
+    const RTE_SIZES = [
+      { label: 'Pequeño', value: '1' },
+      { label: 'Normal', value: '3' },
+      { label: 'Grande', value: '5' },
+      { label: 'Muy grande', value: '7' },
+    ];
+    const RTE_COLORS = ['#1E293B','#7A2638','#2563EB','#15803D','#92400E','#6D28D9','#BE185D','#000000','#64748B','#ffffff'];
+
+    function RichTextEditor({ value, onChange, placeholder }) {
+      const editorRef = React.useRef(null);
+      const [activeFormats, setActiveFormats] = React.useState({ bold: false, italic: false, underline: false });
+      const [showColorPicker, setShowColorPicker] = React.useState(false);
+      const [currentColor, setCurrentColor] = React.useState('#1E293B');
+
+      React.useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== (value || '')) {
+          editorRef.current.innerHTML = value || '';
+        }
+      }, []);
+
+      const exec = (cmd, val) => {
+        editorRef.current && editorRef.current.focus();
+        document.execCommand(cmd, false, val || null);
+        updateFmts();
+        if (editorRef.current) onChange(editorRef.current.innerHTML);
+      };
+
+      const updateFmts = () => setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline')
+      });
+
+      const handleInput = () => { updateFmts(); if (editorRef.current) onChange(editorRef.current.innerHTML); };
+
+      const applyFont = (e) => { if (e.target.value) exec('fontName', e.target.value); };
+      const applySize = (e) => exec('fontSize', e.target.value);
+      const applyColor = (color) => { setCurrentColor(color); exec('foreColor', color); setShowColorPicker(false); };
+
+      return h('div', { style: { position: 'relative' } },
+        h('div', { className: 'rte-toolbar' },
+          // Format buttons
+          h('button', { type: 'button', className: `rte-btn rte-btn-bold ${activeFormats.bold ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('bold'); }, title: 'Negrita (Ctrl+B)' }, 'N'),
+          h('button', { type: 'button', className: `rte-btn rte-btn-italic ${activeFormats.italic ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('italic'); }, title: 'Cursiva (Ctrl+I)' }, 'C'),
+          h('button', { type: 'button', className: `rte-btn rte-btn-underline ${activeFormats.underline ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('underline'); }, title: 'Subrayado (Ctrl+U)' }, 'S'),
+          h('span', { className: 'rte-sep' }),
+          // Font family
+          h('select', { className: 'rte-select', title: 'Tipo de fuente', onChange: applyFont, defaultValue: '' },
+            RTE_FONTS.map(f => h('option', { key: f.value, value: f.value }, f.label))
+          ),
+          // Font size
+          h('select', { className: 'rte-select', title: 'Tamaño', onChange: applySize, defaultValue: '3' },
+            RTE_SIZES.map(s => h('option', { key: s.value, value: s.value }, s.label))
+          ),
+          h('span', { className: 'rte-sep' }),
+          // Color picker toggle
+          h('button', {
+            type: 'button',
+            className: 'rte-btn',
+            title: 'Color del texto',
+            onMouseDown: e => { e.preventDefault(); setShowColorPicker(v => !v); },
+            style: { display: 'flex', alignItems: 'center', gap: '4px', padding: '0.2rem 0.45rem' }
+          },
+            h('span', { style: { display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: currentColor, border: '1px solid #ccc' } }),
+            'Color'
+          )
+        ),
+        // Color palette dropdown
+        showColorPicker && h('div', {
+          style: { position: 'absolute', top: 36, left: 0, zIndex: 999, background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.5rem', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', display: 'flex', gap: '0.35rem', flexWrap: 'wrap', width: 200 }
+        },
+          RTE_COLORS.map(c => h('button', {
+            key: c, type: 'button',
+            onMouseDown: e => { e.preventDefault(); applyColor(c); },
+            style: { width: 28, height: 28, borderRadius: '50%', background: c, border: c === currentColor ? '2px solid var(--ink-blue)' : '1px solid #ccc', cursor: 'pointer', outline: 'none' },
+            title: c
+          }))
+        ),
+        h('div', {
+          ref: editorRef,
+          className: 'rte-editor',
+          contentEditable: true,
+          suppressContentEditableWarning: true,
+          'data-placeholder': placeholder || 'Escribe aquí...',
+          onInput: handleInput,
+          onKeyUp: updateFmts,
+          onMouseUp: updateFmts,
+          onClick: () => setShowColorPicker(false)
+        })
+      );
+    }
+
     // --- NOTES VIEW ---
     function NotesView({ notes, setNotes }) {
       const [showAdd, setShowAdd] = useState(false);
@@ -3324,7 +3534,14 @@
 
       const handleAdd = (e) => {
         e.preventDefault();
+        if (!newNote.content || newNote.content === '<br>') return;
         setNotes([{ ...newNote, id: Date.now().toString(), date: new Date().toISOString().split('T')[0] }, ...notes]);
+        setNewNote({ title: '', category: 'General', content: '' });
+        setShowAdd(false);
+      };
+
+      const handleClose = () => {
+        setNewNote({ title: '', category: 'General', content: '' });
         setShowAdd(false);
       };
 
@@ -3400,22 +3617,23 @@
                     h('button', { type: 'button', onClick: () => handleMoveUp(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▲'),
                     h('button', { type: 'button', onClick: () => handleMoveDown(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▼')
                   ),
+                  h(DownloadMenu, { title: n.title, sections: [{ label: `Categoría: ${n.category} | Fecha: ${formatDateDDMMYYYY(n.date)}`, content: n.content }] }),
                   h('button', { onClick: () => setNotes(notes.filter(item => item.id !== n.id)), style: { border: 'none', background: 'none', cursor: 'pointer', marginLeft: '0.25rem' } }, '🗑️')
                 )
               ),
               h('h3', { style: { fontSize: '1.15rem', marginBottom: '0.4rem' } }, n.title),
-              h('p', { style: { fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, n.content)
+              h('div', { className: 'note-content-html rte-content', style: { fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }, dangerouslySetInnerHTML: { __html: n.content } })
             ),
             h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' } },
               h('span', null, `📅 Creación: ${formatDateDDMMYYYY(n.date)}`)
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
+        showAdd && h('div', { className: 'modal-overlay', onClick: handleClose },
           h('div', { className: 'modal-content', onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', null, 'Añadir Nota Docente'),
-              h('button', { onClick: () => setShowAdd(false) }, '✕')
+              h('button', { onClick: handleClose }, '✕')
             ),
             h('form', { onSubmit: handleAdd },
               h('div', { className: 'modal-body' },
@@ -3434,11 +3652,18 @@
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, 'Contenido'),
-                  h('textarea', { className: 'form-control', rows: 4, value: newNote.content, onChange: e => setNewNote({ ...newNote, content: e.target.value }) })
+                  h('p', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.35rem' } },
+                    h('b', null, 'N'), ' Negrita  ·  ', h('i', null, 'C'), ' Cursiva  ·  ', h('u', null, 'S'), ' Subrayado'
+                  ),
+                  h(RichTextEditor, {
+                    value: newNote.content,
+                    onChange: html => setNewNote(prev => ({ ...prev, content: html })),
+                    placeholder: 'Escribe el contenido de la nota...'
+                  })
                 )
               ),
               h('div', { className: 'modal-footer' },
-                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setShowAdd(false) }, 'Cancelar'),
+                h('button', { type: 'button', className: 'btn btn-secondary', onClick: handleClose }, 'Cancelar'),
                 h('button', { type: 'submit', className: 'btn btn-primary' }, 'Guardar Nota')
               )
             )
@@ -3531,6 +3756,11 @@
                   h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
                 ),
                 h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
+                h(DownloadMenu, { title: m.title, sections: [
+                  { label: '📋 Orden del Día', content: m.agenda },
+                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
+                  { label: '📝 Notas Adicionales', content: m.notes }
+                ]}),
                 h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
               )
             ),
@@ -3571,15 +3801,15 @@
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📋 Orden del Día'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agenda, onChange: e => setFormData({ ...formData, agenda: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agenda, onChange: html => setFormData(p => ({ ...p, agenda: html })), placeholder: 'Puntos del orden del día...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agreements, onChange: e => setFormData({ ...formData, agreements: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agreements, onChange: html => setFormData(p => ({ ...p, agreements: html })), placeholder: 'Acuerdos y decisiones adoptadas...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.notes, onChange: e => setFormData({ ...formData, notes: e.target.value }) })
+                  h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
                   h('input', { type: 'checkbox', id: 'chk_important', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
@@ -3680,6 +3910,11 @@
                   h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
                 ),
                 h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
+                h(DownloadMenu, { title: m.title, sections: [
+                  { label: '📋 Orden del Día', content: m.agenda },
+                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
+                  { label: '📝 Notas Adicionales', content: m.notes }
+                ]}),
                 h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
               )
             ),
@@ -3720,15 +3955,15 @@
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📋 Orden del Día'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agenda, onChange: e => setFormData({ ...formData, agenda: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agenda, onChange: html => setFormData(p => ({ ...p, agenda: html })), placeholder: 'Puntos del orden del día...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agreements, onChange: e => setFormData({ ...formData, agreements: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agreements, onChange: html => setFormData(p => ({ ...p, agreements: html })), placeholder: 'Acuerdos y decisiones adoptadas...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.notes, onChange: e => setFormData({ ...formData, notes: e.target.value }) })
+                  h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
                   h('input', { type: 'checkbox', id: 'chk_important_cl', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
@@ -3865,6 +4100,11 @@
                   h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
                 ),
                 h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
+                h(DownloadMenu, { title: m.title, sections: [
+                  { label: '📋 Orden del Día', content: m.agenda },
+                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
+                  { label: '📝 Notas Adicionales', content: m.notes }
+                ]}),
                 h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
               )
             ),
@@ -3948,15 +4188,15 @@
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📋 Orden del Día'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agenda, onChange: e => setFormData({ ...formData, agenda: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agenda, onChange: html => setFormData(p => ({ ...p, agenda: html })), placeholder: 'Puntos del orden del día...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.agreements, onChange: e => setFormData({ ...formData, agreements: e.target.value }) })
+                  h(RichTextEditor, { value: formData.agreements, onChange: html => setFormData(p => ({ ...p, agreements: html })), placeholder: 'Acuerdos y decisiones adoptadas...' })
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                  h('textarea', { className: 'form-control', rows: 3, value: formData.notes, onChange: e => setFormData({ ...formData, notes: e.target.value }) })
+                  h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
                   h('input', { type: 'checkbox', id: 'chk_important_dept', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
