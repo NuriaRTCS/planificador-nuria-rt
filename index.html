@@ -1209,6 +1209,7 @@
     //      GET /planificador/{pin}.json  → read
 
     const FIREBASE_DB = 'https://planificador-nuria-default-rtdb.europe-west1.firebasedatabase.app';
+    const FIREBASE_SECRET = ''; // Poner la clave secreta de la base de datos si se configura la Opción 2
 
     async function autoPushToCloud(pin, dataObj) {
       if (!pin || typeof pin !== 'string') return;
@@ -1223,7 +1224,8 @@
 
       // 2. Push to Firebase
       try {
-        await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json`, {
+        const authQuery = FIREBASE_SECRET ? `?auth=${FIREBASE_SECRET}` : '';
+        await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json${authQuery}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: payloadStr
@@ -1239,7 +1241,8 @@
       if (cleanPin.length < 4) return false;
 
       try {
-        const res = await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json?nocache=${Date.now()}`);
+        const authQuery = FIREBASE_SECRET ? `auth=${FIREBASE_SECRET}&` : '';
+        const res = await fetch(`${FIREBASE_DB}/planificador/${cleanPin}.json?${authQuery}nocache=${Date.now()}`);
         if (!res.ok) return false;
         const remoteData = await res.json();
         if (!remoteData || typeof remoteData !== 'object') return false;
@@ -1311,7 +1314,7 @@
         setAutoSyncStatus('⚡ Guardando cambios...');
         const timer = setTimeout(() => {
           autoPushToCloud(pin, data);
-          setAutoSyncStatus(`🟢 Sincronizado en tiempo real (PIN: ${pin})`);
+          setAutoSyncStatus('🟢 Sincronizado en tiempo real');
         }, 1800);
 
         return () => clearTimeout(timer);
@@ -1323,7 +1326,7 @@
           const pin = localStorage.getItem('planificador_sync_pin') || "584920";
           autoFetchFromCloud(pin, (newData) => {
             setData(newData);
-            setAutoSyncStatus(`🟢 Actualizado automáticamente (PIN: ${pin})`);
+            setAutoSyncStatus('🟢 Actualizado automáticamente');
           });
         };
 
