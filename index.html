@@ -3057,17 +3057,27 @@
               sortedStudents.length > 0 ? h('table', { className: 'students-table' },
                 h('thead', null,
                   h('tr', null,
-                    h('th', { style: { width: '50px' } }, 'Nº'),
-                    h('th', { style: { width: '240px' } }, 'Alumno/a'),
+                    h('th', { style: { width: '45px', textAlign: 'center' } }, 'Nº'),
+                    h('th', { style: { width: '200px' } }, 'Alumno/a'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, 'Repetidor/a'),
+                    h('th', { style: { width: '90px', textAlign: 'center' } }, 'PEILO'),
                     h('th', null, 'Comentarios y Anotaciones del Alumno/a (Evaluación O)')
                   )
                 ),
                 h('tbody', null,
                   sortedStudents.map((st, idx) => {
                     const commentVal = currentGrades[st.id] || '';
-                    return h('tr', { key: st.id },
-                      h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)' } }, idx + 1),
+                    const isRepeater = Boolean(st.isRepeater);
+                    const isPeilo = Boolean(st.isPeilo);
+                    return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent') } },
+                      h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)', textAlign: 'center' } }, idx + 1),
                       h('td', { style: { fontWeight: 600, color: 'var(--ink-blue)' } }, getStudentDisplayName(st)),
+                      h('td', { style: { textAlign: 'center' } },
+                        isRepeater ? h('span', { className: 'badge', style: { background: '#FEF08A', color: '#854D0E', fontSize: '0.725rem', fontWeight: 700 } }, '🔁 Repetidor/a') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
+                      h('td', { style: { textAlign: 'center' } },
+                        isPeilo ? h('span', { className: 'badge', style: { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FDBA74', fontSize: '0.725rem', fontWeight: 700 } }, '🗣️ PEILO') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
                       h('td', null,
                         h('input', {
                           className: 'form-control',
@@ -3126,9 +3136,11 @@
                 h('thead', null,
                   h('tr', null,
                     h('th', { style: { width: '45px', textAlign: 'center' } }, 'Nº'),
-                    h('th', { style: { width: '190px' } }, 'Alumno/a'),
-                    h('th', { style: { width: '110px', textAlign: 'center' } }, `Nota (0-10)`),
-                    h('th', { style: { width: '160px', textAlign: 'center' } }, 'ÍTACA'),
+                    h('th', { style: { width: '180px' } }, 'Alumno/a'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, 'Repetidor/a'),
+                    h('th', { style: { width: '90px', textAlign: 'center' } }, 'PEILO'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, `Nota (0-10)`),
+                    h('th', { style: { width: '150px', textAlign: 'center' } }, 'ÍTACA'),
                     h('th', null, 'Comentarios y Anotaciones del Alumno/a')
                   )
                 ),
@@ -3138,10 +3150,18 @@
                     const manualStatusVal = currentStatuses[st.id] || 'Auto';
                     const commentVal = currentComments[st.id] || '';
                     const finalSt = getFinalStatus(gradeVal, manualStatusVal);
+                    const isRepeater = Boolean(st.isRepeater);
+                    const isPeilo = Boolean(st.isPeilo);
 
-                    return h('tr', { key: st.id },
+                    return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent') } },
                       h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)', textAlign: 'center' } }, idx + 1),
                       h('td', { style: { fontWeight: 600, color: 'var(--ink-blue)' } }, getStudentDisplayName(st)),
+                      h('td', { style: { textAlign: 'center' } },
+                        isRepeater ? h('span', { className: 'badge', style: { background: '#FEF08A', color: '#854D0E', fontSize: '0.725rem', fontWeight: 700 } }, '🔁 Repetidor/a') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
+                      h('td', { style: { textAlign: 'center' } },
+                        isPeilo ? h('span', { className: 'badge', style: { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FDBA74', fontSize: '0.725rem', fontWeight: 700 } }, '🗣️ PEILO') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
                       h('td', { style: { textAlign: 'center' } },
                         h('input', {
                           type: 'number',
