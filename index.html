@@ -2203,6 +2203,7 @@
       const [newStudentFirstName, setNewStudentFirstName] = useState('');
       const [newStudentLastName, setNewStudentLastName] = useState('');
       const [newStudentIsRepeater, setNewStudentIsRepeater] = useState(false);
+      const [newStudentIsPeilo, setNewStudentIsPeilo] = useState(false);
       const [newStudentNeae, setNewStudentNeae] = useState('');
       const [newStudentNotes, setNewStudentNotes] = useState('');
       const [studentSortBy, setStudentSortBy] = useState('lastName'); // 'lastName' | 'manual'
@@ -2286,6 +2287,7 @@
           lastName: lName,
           name: displayName,
           isRepeater: Boolean(newStudentIsRepeater),
+          isPeilo: Boolean(newStudentIsPeilo),
           neae: newStudentNeae.trim(),
           notes: newStudentNotes.trim(),
           studentNotes: []
@@ -2302,6 +2304,7 @@
         setNewStudentFirstName('');
         setNewStudentLastName('');
         setNewStudentIsRepeater(false);
+        setNewStudentIsPeilo(false);
         setNewStudentNeae('');
         setNewStudentNotes('');
         setShowAddStudent(false);
@@ -2311,6 +2314,17 @@
         const updatedGroups = groups.map(g => {
           if (g.id === activeGroupId) {
             const updatedSts = (g.students || []).map(st => st.id === stId ? { ...st, isRepeater: !st.isRepeater } : st);
+            return { ...g, students: updatedSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+      };
+
+      const handleToggleStudentPeilo = (stId) => {
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const updatedSts = (g.students || []).map(st => st.id === stId ? { ...st, isPeilo: !st.isPeilo } : st);
             return { ...g, students: updatedSts };
           }
           return g;
@@ -2820,7 +2834,8 @@
                 h('tr', null,
                   h('th', { style: { width: '45px', textAlign: 'center' } }, 'Nº'),
                   h('th', null, 'Apellidos, Nombre del Alumno/a'),
-                  h('th', { style: { width: '100px', textAlign: 'center' } }, '🔄 Repetidor'),
+                  h('th', { style: { width: '85px', textAlign: 'center' } }, '🔄 Repetidor'),
+                  h('th', { style: { width: '85px', textAlign: 'center' } }, '🗣️ PEILO'),
                   h('th', { style: { width: '170px' } }, 'NEAE / DUA'),
                   h('th', { style: { width: '140px', textAlign: 'center' } }, '📝 Anotaciones'),
                   h('th', { style: { width: studentSortBy === 'manual' ? '110px' : '75px', textAlign: 'center' } }, 'Acciones')
@@ -2831,18 +2846,20 @@
                   const displayName = getStudentDisplayName(st);
                   const notesCount = (st.studentNotes || []).length;
                   const isRepeater = Boolean(st.isRepeater);
+                  const isPeilo = Boolean(st.isPeilo);
 
-                  return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : 'transparent' } },
+                  return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent') } },
                     h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)', textAlign: 'center' } }, idx + 1),
                     h('td', null,
-                      h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.4rem' } },
+                      h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' } },
                         h('input', {
                           className: 'form-control',
                           style: { border: 'none', background: 'transparent', padding: '0.2rem 0.4rem', fontWeight: 600, fontSize: '0.9rem', color: 'var(--ink-blue)', flex: 1 },
                           value: displayName,
                           onChange: e => handleUpdateStudentField(st.id, 'name', e.target.value)
                         }),
-                        isRepeater && h('span', { className: 'badge', style: { background: '#FEF08A', color: '#854D0E', fontSize: '0.65rem', fontWeight: 700 } }, '🔄 Repetidor')
+                        isRepeater && h('span', { className: 'badge', style: { background: '#FEF08A', color: '#854D0E', fontSize: '0.65rem', fontWeight: 700 } }, '🔄 Repetidor'),
+                        isPeilo && h('span', { className: 'badge', style: { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FDBA74', fontSize: '0.65rem', fontWeight: 700 } }, '🗣️ PEILO')
                       )
                     ),
                     h('td', { style: { textAlign: 'center' } },
@@ -2851,6 +2868,15 @@
                         checked: isRepeater,
                         onChange: () => handleToggleStudentRepeater(st.id),
                         title: 'Marcar si es alumno/a repetidor/a',
+                        style: { width: '16px', height: '16px', cursor: 'pointer' }
+                      })
+                    ),
+                    h('td', { style: { textAlign: 'center' } },
+                      h('input', {
+                        type: 'checkbox',
+                        checked: isPeilo,
+                        onChange: () => handleToggleStudentPeilo(st.id),
+                        title: 'Marcar si es alumno/a PEILO',
                         style: { width: '16px', height: '16px', cursor: 'pointer' }
                       })
                     ),
@@ -2965,16 +2991,18 @@
                   h('tr', null,
                     h('th', { style: { width: '45px', textAlign: 'center' } }, 'Nº'),
                     h('th', { style: { width: '180px' } }, 'Alumno/a'),
-                    h('th', { style: { width: '180px' } }, 'Evaluación O (Diagnóstico)'),
-                    h('th', { style: { width: '110px', textAlign: 'center' } }, '1ª Ev.'),
-                    h('th', { style: { width: '110px', textAlign: 'center' } }, '2ª Ev.'),
-                    h('th', { style: { width: '110px', textAlign: 'center' } }, '3ª Ev. / Final'),
-                    h('th', { style: { width: '120px', textAlign: 'center' } }, 'Tendencia')
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, 'Repetidor/a'),
+                    h('th', { style: { width: '90px', textAlign: 'center' } }, 'PEILO'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, '1ª Ev.'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, '2ª Ev.'),
+                    h('th', { style: { width: '100px', textAlign: 'center' } }, '3ª Ev. / Final'),
+                    h('th', { style: { width: '110px', textAlign: 'center' } }, 'Tendencia')
                   )
                 ),
                 h('tbody', null,
                   sortedStudents.map((st, idx) => {
-                    const ev0Note = (evaluations[0]?.grades?.[st.id]) || '—';
+                    const isRepeater = Boolean(st.isRepeater);
+                    const isPeilo = Boolean(st.isPeilo);
                     
                     const ev1Grade = evaluations[1]?.grades?.[st.id] || '';
                     const ev1Status = getFinalStatus(ev1Grade, evaluations[1]?.statuses?.[st.id]);
@@ -3008,10 +3036,15 @@
                       );
                     };
 
-                    return h('tr', { key: st.id },
+                    return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent') } },
                       h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)', textAlign: 'center' } }, idx + 1),
                       h('td', { style: { fontWeight: 600, color: 'var(--ink-blue)' } }, getStudentDisplayName(st)),
-                      h('td', { style: { fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' } }, ev0Note),
+                      h('td', { style: { textAlign: 'center' } },
+                        isRepeater ? h('span', { className: 'badge', style: { background: '#FEF08A', color: '#854D0E', fontSize: '0.725rem', fontWeight: 700 } }, '🔁 Repetidor/a') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
+                      h('td', { style: { textAlign: 'center' } },
+                        isPeilo ? h('span', { className: 'badge', style: { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FDBA74', fontSize: '0.725rem', fontWeight: 700 } }, '🗣️ PEILO') : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No')
+                      ),
                       h('td', { style: { textAlign: 'center' } }, renderEvBadge(ev1Grade, ev1Status)),
                       h('td', { style: { textAlign: 'center' } }, renderEvBadge(ev2Grade, ev2Status)),
                       h('td', { style: { textAlign: 'center' } }, renderEvBadge(ev3Grade, ev3Status)),
@@ -3316,9 +3349,15 @@
                     h('input', { className: 'form-control', required: true, value: newStudentFirstName, onChange: e => setNewStudentFirstName(e.target.value), placeholder: 'Ej. María' })
                   )
                 ),
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
-                  h('input', { type: 'checkbox', id: 'chk_new_repeater', checked: newStudentIsRepeater, onChange: e => setNewStudentIsRepeater(e.target.checked) }),
-                  h('label', { htmlFor: 'chk_new_repeater', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '🔄 El alumno/a es repetidor/a')
+                h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
+                    h('input', { type: 'checkbox', id: 'chk_new_repeater', checked: newStudentIsRepeater, onChange: e => setNewStudentIsRepeater(e.target.checked) }),
+                    h('label', { htmlFor: 'chk_new_repeater', style: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '🔄 Repetidor/a')
+                  ),
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#FFF7ED', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #FFEDD5' } },
+                    h('input', { type: 'checkbox', id: 'chk_new_peilo', checked: newStudentIsPeilo, onChange: e => setNewStudentIsPeilo(e.target.checked) }),
+                    h('label', { htmlFor: 'chk_new_peilo', style: { fontSize: '0.85rem', fontWeight: 600, color: '#C2410C', cursor: 'pointer' } }, '🗣️ PEILO')
+                  )
                 ),
                 h('div', { className: 'form-group' },
                   h('label', { className: 'form-label' }, 'Observaciones NEAE / DUA (Opcional)'),
