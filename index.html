@@ -598,15 +598,29 @@
     .rte-editor { min-height: 120px; padding: 0.65rem 0.85rem; border: 1px solid var(--border-subtle); border-radius: 0 0 var(--radius-sm) var(--radius-sm); background: #fff; font-size: 0.95rem; line-height: 1.6; color: var(--text-primary); outline: none; cursor: text; }
     .rte-editor:empty:before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
     .rte-editor:focus { border-color: var(--gold-accent); box-shadow: 0 0 0 3px rgba(196,154,69,0.12); }
-    .rte-content b, .rte-content strong { font-weight: 700; }
-    .rte-content i, .rte-content em { font-style: italic; }
-    .rte-content u { text-decoration: underline; }
-    .rte-content ul { list-style-type: disc; padding-left: 1.5em; margin: 0.25em 0; }
-    .rte-content ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.25em 0; }
-    .rte-content li { margin: 0.15em 0; }
-    .rte-editor ul { list-style-type: disc; padding-left: 1.5em; margin: 0.25em 0; }
-    .rte-editor ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.25em 0; }
-    .rte-editor li { margin: 0.15em 0; }
+    .rte-content b, .rte-content strong, .rte-editor b, .rte-editor strong { font-weight: 700; }
+    .rte-content i, .rte-content em, .rte-editor i, .rte-editor em { font-style: italic; }
+    .rte-content u, .rte-editor u { text-decoration: underline; }
+    .rte-content ul, .rte-editor ul { list-style-type: disc; padding-left: 1.75em; margin: 0.35em 0; }
+    .rte-content ol, .rte-editor ol { list-style-type: decimal; padding-left: 1.75em; margin: 0.35em 0; }
+    .rte-content li, .rte-editor li { margin: 0.2em 0; }
+    
+    /* Inherit formatting (bold, italic, underline, color, font, size) for automatic list numbering and bullets */
+    .rte-content li::marker, .rte-editor li::marker {
+      font-weight: inherit;
+      font-style: inherit;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      text-decoration: inherit;
+    }
+    .rte-content li:has(> b)::marker, .rte-editor li:has(> b)::marker,
+    .rte-content li:has(> strong)::marker, .rte-editor li:has(> strong)::marker { font-weight: 700; }
+
+    .rte-content li:has(> i)::marker, .rte-editor li:has(> i)::marker,
+    .rte-content li:has(> em)::marker, .rte-editor li:has(> em)::marker { font-style: italic; }
+
+    .rte-content li:has(> u)::marker, .rte-editor li:has(> u)::marker { text-decoration: underline; }
 
     .badge {
       display: inline-flex;
