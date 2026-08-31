@@ -601,6 +601,12 @@
     .rte-content b, .rte-content strong { font-weight: 700; }
     .rte-content i, .rte-content em { font-style: italic; }
     .rte-content u { text-decoration: underline; }
+    .rte-content ul { list-style-type: disc; padding-left: 1.5em; margin: 0.25em 0; }
+    .rte-content ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+    .rte-content li { margin: 0.15em 0; }
+    .rte-editor ul { list-style-type: disc; padding-left: 1.5em; margin: 0.25em 0; }
+    .rte-editor ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.25em 0; }
+    .rte-editor li { margin: 0.15em 0; }
 
     .badge {
       display: inline-flex;
@@ -3333,7 +3339,7 @@
 
         /* MODAL FOR STUDENT DATED ANNOTATIONS */
         activeStudentForNotes && h('div', { className: 'modal-overlay', onClick: () => setActiveStudentForNotes(null) },
-          h('div', { className: 'modal-content', style: { maxWidth: '580px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('div', null,
                 h('h3', { style: { fontSize: '1.15rem', color: 'var(--ink-blue)' } }, `📝 Anotaciones de Alumno/a — ${getStudentDisplayName(activeStudentForNotes)}`),
@@ -3383,7 +3389,7 @@
 
         /* MODAL FOR JOURNAL OBSERVATION CREATION WITH CUSTOM DATE & IMPORTANT CHECKBOX */
         showAddObs && h('div', { className: 'modal-overlay', onClick: () => setShowAddObs(false) },
-          h('div', { className: 'modal-content', style: { maxWidth: '580px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('div', null,
                 h('h3', { style: { fontSize: '1.15rem', color: 'var(--ink-blue)' } }, `Nueva Anotación — ${activeGroup.name}`),
@@ -3439,6 +3445,12 @@
       { label: 'Grande', value: '5' },
       { label: 'Muy grande', value: '7' },
     ];
+    const RTE_ALIGNMENTS = [
+      { label: '⇇ Izquierda', value: 'justifyLeft' },
+      { label: '↔ Centrado', value: 'justifyCenter' },
+      { label: '⇉ Derecha', value: 'justifyRight' },
+      { label: '☰ Justificado', value: 'justifyFull' },
+    ];
     const RTE_COLORS = ['#1E293B','#7A2638','#2563EB','#15803D','#92400E','#6D28D9','#BE185D','#000000','#64748B','#ffffff'];
 
     function RichTextEditor({ value, onChange, placeholder }) {
@@ -3470,6 +3482,7 @@
 
       const applyFont = (e) => { if (e.target.value) exec('fontName', e.target.value); };
       const applySize = (e) => exec('fontSize', e.target.value);
+      const applyAlign = (e) => { if (e.target.value) exec(e.target.value); };
       const applyColor = (color) => { setCurrentColor(color); exec('foreColor', color); setShowColorPicker(false); };
 
       return h('div', { style: { position: 'relative' } },
@@ -3478,6 +3491,15 @@
           h('button', { type: 'button', className: `rte-btn rte-btn-bold ${activeFormats.bold ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('bold'); }, title: 'Negrita (Ctrl+B)' }, 'N'),
           h('button', { type: 'button', className: `rte-btn rte-btn-italic ${activeFormats.italic ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('italic'); }, title: 'Cursiva (Ctrl+I)' }, 'C'),
           h('button', { type: 'button', className: `rte-btn rte-btn-underline ${activeFormats.underline ? 'active' : ''}`, onMouseDown: e => { e.preventDefault(); exec('underline'); }, title: 'Subrayado (Ctrl+U)' }, 'S'),
+          h('span', { className: 'rte-sep' }),
+          // Alignment dropdown
+          h('select', { className: 'rte-select', title: 'Alineación de texto', onChange: applyAlign, defaultValue: 'justifyLeft' },
+            RTE_ALIGNMENTS.map(a => h('option', { key: a.value, value: a.value }, a.label))
+          ),
+          h('span', { className: 'rte-sep' }),
+          // List buttons
+          h('button', { type: 'button', className: 'rte-btn', onMouseDown: e => { e.preventDefault(); exec('insertUnorderedList'); }, title: 'Lista con viñetas', style: { fontSize: '1rem', lineHeight: 1 } }, '•≡'),
+          h('button', { type: 'button', className: 'rte-btn', onMouseDown: e => { e.preventDefault(); exec('insertOrderedList'); }, title: 'Lista numerada', style: { fontSize: '0.8rem', lineHeight: 1 } }, '1≡'),
           h('span', { className: 'rte-sep' }),
           // Font family
           h('select', { className: 'rte-select', title: 'Tipo de fuente', onChange: applyFont, defaultValue: '' },
@@ -3630,7 +3652,7 @@
           ))
         ),
         showAdd && h('div', { className: 'modal-overlay', onClick: handleClose },
-          h('div', { className: 'modal-content', onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', null, 'Añadir Nota Docente'),
               h('button', { onClick: handleClose }, '✕')
@@ -3768,21 +3790,21 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.agenda || 'Sin especificar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'pre-line' } }, m.agreements || 'Sin registrar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.notes)
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
             )
           ))
         ),
         showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
-          h('div', { className: 'modal-content', style: { maxWidth: '650px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento CCP' : 'Nuevo Documento de Reunión CCP (+ CCP)'),
               h('button', { onClick: () => setShowAdd(false) }, '✕')
@@ -3922,21 +3944,21 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.agenda || 'Sin especificar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'pre-line' } }, m.agreements || 'Sin registrar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.notes)
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
             )
           ))
         ),
         showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
-          h('div', { className: 'modal-content', style: { maxWidth: '650px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento Claustro' : 'Nuevo Documento (+ CLAUSTRO)'),
               h('button', { onClick: () => setShowAdd(false) }, '✕')
@@ -4115,21 +4137,21 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.agenda || 'Sin especificar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('p', { style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'pre-line' } }, m.agreements || 'Sin registrar')
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'pre-line' } }, m.notes)
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
             )
           ))
         ),
         showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
-          h('div', { className: 'modal-content', style: { maxWidth: '700px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-content', style: { maxWidth: '840px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento de Departamento' : 'Nuevo Documento (+ Departamento)'),
               h('button', { onClick: () => setShowAdd(false) }, '✕')
