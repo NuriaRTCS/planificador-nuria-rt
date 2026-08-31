@@ -602,11 +602,29 @@
     .rte-content i, .rte-content em, .rte-editor i, .rte-editor em { font-style: italic; }
     .rte-content u, .rte-editor u { text-decoration: underline; }
     .rte-content ul, .rte-editor ul { list-style-type: disc; padding-left: 1.75em; margin: 0.35em 0; }
-    .rte-content ol, .rte-editor ol { list-style-type: decimal; padding-left: 1.75em; margin: 0.35em 0; }
-    .rte-content li, .rte-editor li { margin: 0.25em 0; }
     
-    /* Universal formatting inheritance (bold, italic, underline, color, font, size) for automatic list numbers & bullets in ALL text editors */
-    .rte-content li::marker, .rte-editor li::marker {
+    /* CSS counter for ordered lists so hiding/deleting a number never breaks the sequence */
+    .rte-content ol, .rte-editor ol {
+      list-style-type: none;
+      counter-reset: rte-list-counter var(--ol-start, 0);
+      padding-left: 1.75em;
+      margin: 0.35em 0;
+    }
+    .rte-content ol > li, .rte-editor ol > li {
+      counter-increment: rte-list-counter;
+      position: relative;
+      margin: 0.25em 0;
+    }
+    .rte-content ol > li[data-no-number="true"], .rte-editor ol > li[data-no-number="true"],
+    .rte-content ol > li.no-number, .rte-editor ol > li.no-number,
+    .rte-content ol > li[style*="list-style-type: none"], .rte-editor ol > li[style*="list-style-type: none"],
+    .rte-content ol > li[style*="list-style: none"], .rte-editor ol > li[style*="list-style: none"] {
+      counter-increment: none;
+    }
+    
+    /* Universal formatting inheritance (bold, italic, underline, color, font, size) for list numbers & bullets */
+    .rte-content ol > li::marker, .rte-editor ol > li::marker {
+      content: counter(rte-list-counter) ". ";
       font-weight: inherit;
       font-style: inherit;
       font-family: inherit;
@@ -614,6 +632,23 @@
       color: inherit;
       text-decoration: inherit;
     }
+    .rte-content ul > li::marker, .rte-editor ul > li::marker {
+      font-weight: inherit;
+      font-style: inherit;
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      text-decoration: inherit;
+    }
+    
+    /* Hide marker on line without breaking counter for next items */
+    .rte-content ol > li[data-no-number="true"]::marker, .rte-editor ol > li[data-no-number="true"]::marker,
+    .rte-content ol > li.no-number::marker, .rte-editor ol > li.no-number::marker,
+    .rte-content ol > li[style*="list-style-type: none"]::marker, .rte-editor ol > li[style*="list-style-type: none"]::marker,
+    .rte-content ol > li[style*="list-style: none"]::marker, .rte-editor ol > li[style*="list-style: none"]::marker {
+      content: "";
+    }
+    
     .rte-content li:has(b)::marker, .rte-editor li:has(b)::marker,
     .rte-content li:has(strong)::marker, .rte-editor li:has(strong)::marker { font-weight: 700; }
 
@@ -3506,6 +3541,34 @@
       );
     }
 
+    // --- RICH TEXT PROCESSOR HELPER FOR PERFECT LIST SEQUENCES ---
+    function processRteHtml(htmlStr) {
+      if (!htmlStr || typeof htmlStr !== 'string' || !htmlStr.includes('<ol')) return htmlStr || '';
+      try {
+        const div = document.createElement('div');
+        div.innerHTML = htmlStr;
+        const ols = div.querySelectorAll('ol');
+        let currentCount = 1;
+        ols.forEach(ol => {
+          ol.setAttribute('start', currentCount);
+          ol.style.setProperty('--ol-start', currentCount - 1);
+          ol.style.counterReset = `rte-list-counter ${currentCount - 1}`;
+          const lis = ol.querySelectorAll(':scope > li');
+          lis.forEach(li => {
+            const isHidden = li.getAttribute('data-no-number') === 'true' || 
+                             li.classList.contains('no-number') || 
+                             (li.style.listStyleType && li.style.listStyleType.includes('none'));
+            if (!isHidden) {
+              currentCount++;
+            }
+          });
+        });
+        return div.innerHTML;
+      } catch(e) {
+        return htmlStr;
+      }
+    }
+
     // --- RICH TEXT EDITOR COMPONENT ---
     const RTE_FONTS = [
       { label: 'Predeterminada', value: '' },
@@ -3535,16 +3598,38 @@
       const [showColorPicker, setShowColorPicker] = React.useState(false);
       const [currentColor, setCurrentColor] = React.useState('#1E293B');
 
+      const resequence = () => {
+        if (!editorRef.current) return;
+        const ols = editorRef.current.querySelectorAll('ol');
+        let currentCount = 1;
+        ols.forEach(ol => {
+          ol.setAttribute('start', currentCount);
+          ol.style.setProperty('--ol-start', currentCount - 1);
+          ol.style.counterReset = `rte-list-counter ${currentCount - 1}`;
+          const lis = ol.querySelectorAll(':scope > li');
+          lis.forEach(li => {
+            const isHidden = li.getAttribute('data-no-number') === 'true' || 
+                             li.classList.contains('no-number') || 
+                             (li.style.listStyleType && li.style.listStyleType.includes('none'));
+            if (!isHidden) {
+              currentCount++;
+            }
+          });
+        });
+      };
+
       React.useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== (value || '')) {
           editorRef.current.innerHTML = value || '';
+          resequence();
         }
-      }, []);
+      }, [value]);
 
       const exec = (cmd, val) => {
         editorRef.current && editorRef.current.focus();
         document.execCommand(cmd, false, val || null);
         updateFmts();
+        resequence();
         if (editorRef.current) onChange(editorRef.current.innerHTML);
       };
 
@@ -3554,7 +3639,32 @@
         underline: document.queryCommandState('underline')
       });
 
-      const handleInput = () => { updateFmts(); if (editorRef.current) onChange(editorRef.current.innerHTML); };
+      const handleInput = () => {
+        updateFmts();
+        resequence();
+        if (editorRef.current) onChange(editorRef.current.innerHTML);
+      };
+
+      const toggleLineNumber = (e) => {
+        e.preventDefault();
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+        let node = selection.getRangeAt(0).startContainer;
+        while (node && node !== editorRef.current && node.nodeName !== 'LI') {
+          node = node.parentNode;
+        }
+        if (node && node.nodeName === 'LI') {
+          const isHidden = node.getAttribute('data-no-number') === 'true' || node.style.listStyleType === 'none';
+          if (isHidden) {
+            node.removeAttribute('data-no-number');
+            node.style.listStyleType = '';
+          } else {
+            node.setAttribute('data-no-number', 'true');
+            node.style.listStyleType = 'none';
+          }
+          handleInput();
+        }
+      };
 
       const applyFont = (e) => { if (e.target.value) exec('fontName', e.target.value); };
       const applySize = (e) => exec('fontSize', e.target.value);
@@ -3576,6 +3686,7 @@
           // List buttons
           h('button', { type: 'button', className: 'rte-btn', onMouseDown: e => { e.preventDefault(); exec('insertUnorderedList'); }, title: 'Lista con viñetas', style: { fontSize: '1rem', lineHeight: 1 } }, '•≡'),
           h('button', { type: 'button', className: 'rte-btn', onMouseDown: e => { e.preventDefault(); exec('insertOrderedList'); }, title: 'Lista numerada', style: { fontSize: '0.8rem', lineHeight: 1 } }, '1≡'),
+          h('button', { type: 'button', className: 'rte-btn', onMouseDown: toggleLineNumber, title: 'Quitar / Mostrar número en esta fila (mantiene la numeración)', style: { fontSize: '0.8rem', padding: '0.2rem 0.4rem', color: '#C2410C', fontWeight: 700 } }, '🚫 1.'),
           h('span', { className: 'rte-sep' }),
           // Font family
           h('select', { className: 'rte-select', title: 'Tipo de fuente', onChange: applyFont, defaultValue: '' },
@@ -3720,7 +3831,7 @@
                 )
               ),
               h('h3', { style: { fontSize: '1.15rem', marginBottom: '0.4rem' } }, n.title),
-              h('div', { className: 'note-content-html rte-content', style: { fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }, dangerouslySetInnerHTML: { __html: n.content } })
+              h('div', { className: 'note-content-html rte-content', style: { fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }, dangerouslySetInnerHTML: { __html: processRteHtml(n.content) } })
             ),
             h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' } },
               h('span', null, `📅 Creación: ${formatDateDDMMYYYY(n.date)}`)
@@ -3775,16 +3886,16 @@
       const [showAdd, setShowAdd] = useState(false);
       const [sortBy, setSortBy] = useState('manual');
       const [editingMeeting, setEditingMeeting] = useState(null);
-      const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], agenda: '', agreements: '', notes: '', important: false });
+      const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '', agenda: '', agreements: '', notes: '', important: false });
 
       const handleOpenAdd = () => {
-        setFormData({ title: `Reunión CCP nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
+        setFormData({ title: `Reunión CCP nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '16:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
         setEditingMeeting(null);
         setShowAdd(true);
       };
 
       const handleOpenEdit = (m) => {
-        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
+        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], time: m.time || '', agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
         setEditingMeeting(m);
         setShowAdd(true);
       };
@@ -3843,8 +3954,8 @@
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
           sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--gold-accent)', padding: '1.25rem' } },
             h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center' } },
-                h('span', { className: 'badge badge-gold' }, `📅 Fecha Reunión: ${formatDateDDMMYYYY(m.date)}`),
+              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+                h('span', { className: 'badge badge-gold' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
                 m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
               ),
               h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
@@ -3866,16 +3977,16 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
             )
           ))
         ),
@@ -3887,7 +3998,7 @@
             ),
             h('form', { onSubmit: handleSave },
               h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' } },
+                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' } },
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Título'),
                     h('input', { className: 'form-control', required: true, value: formData.title, onChange: e => setFormData({ ...formData, title: e.target.value }) })
@@ -3895,6 +4006,10 @@
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Fecha'),
                     h('input', { type: 'date', className: 'form-control', required: true, value: formData.date, onChange: e => setFormData({ ...formData, date: e.target.value }) })
+                  ),
+                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                    h('label', { className: 'form-label' }, 'Hora'),
+                    h('input', { type: 'time', className: 'form-control', value: formData.time || '', onChange: e => setFormData({ ...formData, time: e.target.value }) })
                   )
                 ),
                 h('div', { className: 'form-group' },
@@ -3929,16 +4044,16 @@
       const [showAdd, setShowAdd] = useState(false);
       const [sortBy, setSortBy] = useState('manual');
       const [editingMeeting, setEditingMeeting] = useState(null);
-      const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], agenda: '', agreements: '', notes: '', important: false });
+      const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '', agenda: '', agreements: '', notes: '', important: false });
 
       const handleOpenAdd = () => {
-        setFormData({ title: `Claustro nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
+        setFormData({ title: `Claustro nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '17:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
         setEditingMeeting(null);
         setShowAdd(true);
       };
 
       const handleOpenEdit = (m) => {
-        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
+        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], time: m.time || '', agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
         setEditingMeeting(m);
         setShowAdd(true);
       };
@@ -3997,8 +4112,8 @@
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
           sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--ink-blue)', padding: '1.25rem' } },
             h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center' } },
-                h('span', { className: 'badge badge-ink' }, `📅 Fecha Reunión: ${formatDateDDMMYYYY(m.date)}`),
+              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+                h('span', { className: 'badge badge-ink' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
                 m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
               ),
               h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
@@ -4020,16 +4135,16 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
             )
           ))
         ),
@@ -4041,7 +4156,7 @@
             ),
             h('form', { onSubmit: handleSave },
               h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' } },
+                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' } },
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Título'),
                     h('input', { className: 'form-control', required: true, value: formData.title, onChange: e => setFormData({ ...formData, title: e.target.value }) })
@@ -4049,6 +4164,10 @@
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Fecha'),
                     h('input', { type: 'date', className: 'form-control', required: true, value: formData.date, onChange: e => setFormData({ ...formData, date: e.target.value }) })
+                  ),
+                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                    h('label', { className: 'form-label' }, 'Hora'),
+                    h('input', { type: 'time', className: 'form-control', value: formData.time || '', onChange: e => setFormData({ ...formData, time: e.target.value }) })
                   )
                 ),
                 h('div', { className: 'form-group' },
@@ -4087,6 +4206,7 @@
       const [formData, setFormData] = useState({
         title: '',
         date: new Date().toISOString().split('T')[0],
+        time: '',
         meetingType: 'Ordinaria',
         attendees: DEFAULT_DEPT_TEACHERS.join(', '),
         agenda: '',
@@ -4099,6 +4219,7 @@
         setFormData({
           title: `Reunión de Departamento nº ${meetings.length + 1}`,
           date: new Date().toISOString().split('T')[0],
+          time: '15:30',
           meetingType: 'Ordinaria',
           attendees: DEFAULT_DEPT_TEACHERS.join(', '),
           agenda: '1. \n2. \n3. ',
@@ -4186,7 +4307,7 @@
           sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--burgundy)', padding: '1.25rem' } },
             h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
               h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
-                h('span', { className: 'badge badge-burgundy' }, `📅 Fecha Reunión: ${formatDateDDMMYYYY(m.date)}`),
+                h('span', { className: 'badge badge-burgundy' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
                 h('span', { className: 'badge', style: { background: m.meetingType === 'Extraordinaria' ? '#FEE2E2' : '#E9EEF4', color: m.meetingType === 'Extraordinaria' ? '#991B1B' : 'var(--ink-blue)', border: m.meetingType === 'Extraordinaria' ? '1px solid #FCA5A5' : '1px solid var(--border-subtle)' } }, `🏷️ Sesión ${m.meetingType || 'Ordinaria'}`),
                 m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
               ),
@@ -4213,16 +4334,16 @@
             h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.agenda || '<em>Sin especificar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
               ),
               h('div', null,
                 h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: m.agreements || '<em>Sin registrar</em>' } })
+                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
               )
             ),
             m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
               h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: m.notes } })
+              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
             )
           ))
         ),
@@ -4234,7 +4355,7 @@
             ),
             h('form', { onSubmit: handleSave },
               h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' } },
+                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' } },
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Título'),
                     h('input', { className: 'form-control', required: true, value: formData.title, onChange: e => setFormData({ ...formData, title: e.target.value }) })
@@ -4242,6 +4363,10 @@
                   h('div', { className: 'form-group', style: { marginBottom: 0 } },
                     h('label', { className: 'form-label' }, 'Fecha'),
                     h('input', { type: 'date', className: 'form-control', required: true, value: formData.date, onChange: e => setFormData({ ...formData, date: e.target.value }) })
+                  ),
+                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                    h('label', { className: 'form-label' }, 'Hora'),
+                    h('input', { type: 'time', className: 'form-control', value: formData.time || '', onChange: e => setFormData({ ...formData, time: e.target.value }) })
                   )
                 ),
                 h('div', { className: 'form-group', style: { marginBottom: 0 } },
