@@ -1592,6 +1592,7 @@
       };
 
       const handleDeleteEvt = (dateStr) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar esta anotación del calendario?')) return;
         const filtered = (data.calendarEvents || []).filter(e => e.date !== dateStr);
         setData({ ...data, calendarEvents: filtered });
       };
@@ -1762,6 +1763,7 @@
       };
 
       const handleDeleteEvt = (dateStr) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar esta anotación del calendario?')) return;
         setEvents(events.filter(e => e.date !== dateStr));
       };
 
@@ -2141,6 +2143,7 @@
       };
 
       const handleClearSessionSlot = (timeStr) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas borrar el contenido de esta sesión lectiva?')) return;
         const updated = { ...slotsData };
         delete updated[timeStr];
         setSlotsData(updated);
@@ -2419,6 +2422,7 @@
       };
 
       const handleDeleteStudentAnnotation = (stId, noteId) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar esta anotación del alumno/a?')) return;
         const updatedGroups = groups.map(g => {
           if (g.id === activeGroupId) {
             const updatedSts = (g.students || []).map(st => {
@@ -2474,6 +2478,7 @@
       };
 
       const handleDeleteStudent = (stId) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar a este alumno/a de la lista del grupo?')) return;
         const updatedGroups = groups.map(g => {
           if (g.id === activeGroupId) {
             const filteredSts = (g.students || []).filter(st => st.id !== stId).map((st, idx) => ({ ...st, number: idx + 1 }));
@@ -2700,6 +2705,7 @@
       };
 
       const handleDeleteObservation = (obsId) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar esta anotación del Diario de Aula?')) return;
         const updatedGroups = groups.map(g => {
           if (g.id === activeGroupId) {
             return { ...g, observations: (g.observations || []).filter(o => o.id !== obsId) };
@@ -3827,7 +3833,7 @@
                     h('button', { type: 'button', onClick: () => handleMoveDown(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▼')
                   ),
                   h(DownloadMenu, { title: n.title, sections: [{ label: `Categoría: ${n.category} | Fecha: ${formatDateDDMMYYYY(n.date)}`, content: n.content }] }),
-                  h('button', { onClick: () => setNotes(notes.filter(item => item.id !== n.id)), style: { border: 'none', background: 'none', cursor: 'pointer', marginLeft: '0.25rem' } }, '🗑️')
+                  h('button', { onClick: () => { if (window.confirm('¿Estás seguro/a de que deseas eliminar esta nota docente?')) setNotes(notes.filter(item => item.id !== n.id)); }, style: { border: 'none', background: 'none', cursor: 'pointer', marginLeft: '0.25rem' }, title: 'Eliminar nota' }, '🗑️')
                 )
               ),
               h('h3', { style: { fontSize: '1.15rem', marginBottom: '0.4rem' } }, n.title),
@@ -3907,7 +3913,11 @@
         setShowAdd(false);
       };
 
-      const handleDelete = (id) => setMeetings(meetings.filter(m => m.id !== id));
+      const handleDelete = (id) => {
+        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de CCP?')) {
+          setMeetings(meetings.filter(m => m.id !== id));
+        }
+      };
       const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
 
       const handleMoveUp = (id) => {
@@ -4065,7 +4075,11 @@
         setShowAdd(false);
       };
 
-      const handleDelete = (id) => setMeetings(meetings.filter(m => m.id !== id));
+      const handleDelete = (id) => {
+        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de Claustro?')) {
+          setMeetings(meetings.filter(m => m.id !== id));
+        }
+      };
       const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
 
       const handleMoveUp = (id) => {
@@ -4260,7 +4274,11 @@
         setShowAdd(false);
       };
 
-      const handleDelete = (id) => setMeetings(meetings.filter(m => m.id !== id));
+      const handleDelete = (id) => {
+        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de Departamento?')) {
+          setMeetings(meetings.filter(m => m.id !== id));
+        }
+      };
       const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
 
       const handleMoveUp = (id) => {
