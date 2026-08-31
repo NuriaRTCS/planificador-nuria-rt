@@ -1802,7 +1802,7 @@
       const formattedDate = `${dayNameCapitalized}, ${formatDateDDMMYYYY(dateStr)}`;
       const showTimeInput = (tag === 'evaluacion' || tag === 'ccp' || tag === 'claustro');
 
-      return h('div', { className: 'modal-overlay', onClick: onClose },
+      return h('div', { className: 'modal-overlay' },
         h('div', { className: 'modal-content', style: { maxWidth: '600px' }, onClick: e => e.stopPropagation() },
           h('div', { className: 'modal-header' },
             h('div', null,
@@ -2117,7 +2117,7 @@
         setSlotsData({ ...slotsData, [timeStr]: { ...currentSlot, blocks: currentBlocks } });
       };
 
-      return h('div', { className: 'modal-overlay', onClick: onClose },
+      return h('div', { className: 'modal-overlay' },
         h('div', { className: 'modal-content', onClick: e => e.stopPropagation() },
           h('div', { className: 'modal-header' },
             h('div', null,
@@ -3351,7 +3351,7 @@
         ),
 
         /* MODAL FOR MANUAL STUDENT CREATION */
-        showAddStudent && h('div', { className: 'modal-overlay', onClick: () => setShowAddStudent(false) },
+        showAddStudent && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '520px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('div', null,
@@ -3400,7 +3400,7 @@
         ),
 
         /* MODAL FOR STUDENT DATED ANNOTATIONS */
-        activeStudentForNotes && h('div', { className: 'modal-overlay', onClick: () => setActiveStudentForNotes(null) },
+        activeStudentForNotes && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('div', null,
@@ -3450,7 +3450,7 @@
         ),
 
         /* MODAL FOR JOURNAL OBSERVATION CREATION WITH CUSTOM DATE & IMPORTANT CHECKBOX */
-        showAddObs && h('div', { className: 'modal-overlay', onClick: () => setShowAddObs(false) },
+        showAddObs && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('div', null,
@@ -3713,7 +3713,7 @@
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay', onClick: handleClose },
+        showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', null, 'Añadir Nota Docente'),
@@ -3865,7 +3865,7 @@
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
+        showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento CCP' : 'Nuevo Documento de Reunión CCP (+ CCP)'),
@@ -4019,7 +4019,7 @@
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
+        showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento Claustro' : 'Nuevo Documento (+ CLAUSTRO)'),
@@ -4212,7 +4212,7 @@
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay', onClick: () => setShowAdd(false) },
+        showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '840px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
               h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento de Departamento' : 'Nuevo Documento (+ Departamento)'),
