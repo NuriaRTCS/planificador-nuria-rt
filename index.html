@@ -603,9 +603,9 @@
     .rte-content u, .rte-editor u { text-decoration: underline; }
     .rte-content ul, .rte-editor ul { list-style-type: disc; padding-left: 1.75em; margin: 0.35em 0; }
     .rte-content ol, .rte-editor ol { list-style-type: decimal; padding-left: 1.75em; margin: 0.35em 0; }
-    .rte-content li, .rte-editor li { margin: 0.2em 0; }
+    .rte-content li, .rte-editor li { margin: 0.25em 0; }
     
-    /* Inherit formatting (bold, italic, underline, color, font, size) for automatic list numbering and bullets */
+    /* Universal formatting inheritance (bold, italic, underline, color, font, size) for automatic list numbers & bullets in ALL text editors */
     .rte-content li::marker, .rte-editor li::marker {
       font-weight: inherit;
       font-style: inherit;
@@ -614,13 +614,13 @@
       color: inherit;
       text-decoration: inherit;
     }
-    .rte-content li:has(> b)::marker, .rte-editor li:has(> b)::marker,
-    .rte-content li:has(> strong)::marker, .rte-editor li:has(> strong)::marker { font-weight: 700; }
+    .rte-content li:has(b)::marker, .rte-editor li:has(b)::marker,
+    .rte-content li:has(strong)::marker, .rte-editor li:has(strong)::marker { font-weight: 700; }
 
-    .rte-content li:has(> i)::marker, .rte-editor li:has(> i)::marker,
-    .rte-content li:has(> em)::marker, .rte-editor li:has(> em)::marker { font-style: italic; }
+    .rte-content li:has(i)::marker, .rte-editor li:has(i)::marker,
+    .rte-content li:has(em)::marker, .rte-editor li:has(em)::marker { font-style: italic; }
 
-    .rte-content li:has(> u)::marker, .rte-editor li:has(> u)::marker { text-decoration: underline; }
+    .rte-content li:has(u)::marker, .rte-editor li:has(u)::marker { text-decoration: underline; }
 
     .badge {
       display: inline-flex;
