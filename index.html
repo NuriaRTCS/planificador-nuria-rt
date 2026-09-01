@@ -1006,6 +1006,91 @@
       return `${rYyyy}-${rMm}-${rDd}`;
     }
 
+    // --- INITIAL TEACHER SCHEDULE DATA ---
+    const INITIAL_TEACHER_SCHEDULE = [
+      {
+        time: '08:00 – 08:55',
+        type: 'class',
+        monday: '—',
+        tuesday: 'Lengua Castellana 4º ESO A',
+        wednesday: 'Lengua Castellana 4º ESO C',
+        thursday: 'Lengua Castellana 4º ESO A',
+        friday: '—'
+      },
+      {
+        time: '08:55 – 09:50',
+        type: 'class',
+        monday: '—',
+        tuesday: 'Lengua Castellana 1º Bachillerato Científico',
+        wednesday: 'Literatura Universal 1º / 2º Bachillerato',
+        thursday: 'Reunión Convivència',
+        friday: 'Lengua Castellana 1º Bachillerato Científico'
+      },
+      {
+        time: '09:50 – 10:45',
+        type: 'class',
+        monday: '—',
+        tuesday: 'Coordinació Didàctica (L)',
+        wednesday: 'Coordinació Didàctica (L)',
+        thursday: 'Literatura Universal 1º / 2º Bachillerato',
+        friday: 'Lectives Autoritzades'
+      },
+      {
+        time: '10:45 – 11:10',
+        type: 'patio',
+        monday: 'Recreo',
+        tuesday: 'Guardia de Patio',
+        wednesday: 'Patio / Biblioteca',
+        thursday: 'Recreo',
+        friday: 'Recreo'
+      },
+      {
+        time: '11:10 – 12:05',
+        type: 'class',
+        monday: 'Atención Familias',
+        tuesday: '—',
+        wednesday: 'Lectives Autoritzades',
+        thursday: 'Lengua Castellana 4º ESO C',
+        friday: 'Lengua Castellana 4º ESO A'
+      },
+      {
+        time: '12:05 – 13:00',
+        type: 'class',
+        monday: 'Lengua Castellana 4º ESO C',
+        tuesday: '—',
+        wednesday: 'OA - Conflictes',
+        thursday: 'OA - Conflictes',
+        friday: 'Literatura Universal 1º / 2º Bachillerato'
+      },
+      {
+        time: '13:00 – 13:55',
+        type: 'class',
+        monday: 'Literatura Universal 1º / 2º Bachillerato',
+        tuesday: '—',
+        wednesday: '—',
+        thursday: 'Lengua Castellana 1º Bachillerato Científico',
+        friday: '—'
+      },
+      {
+        time: '13:55 – 14:05',
+        type: 'rest',
+        monday: 'Descanso',
+        tuesday: '—',
+        wednesday: '—',
+        thursday: 'Descanso',
+        friday: '—'
+      },
+      {
+        time: '14:05 – 15:00',
+        type: 'class',
+        monday: 'Reunión Departamento (Castellano)',
+        tuesday: '—',
+        wednesday: '—',
+        thursday: '—',
+        friday: '—'
+      }
+    ];
+
     // --- INITIAL DATA ---
     const INITIAL_DATA = {
       calendarEvents: [
@@ -1025,6 +1110,7 @@
         { id: 'n1', title: 'Lecturas obligatorias 1er Trimestre', category: 'Programación', content: '3º ESO: "Lazarillo de Tormes"\n1º Bachillerato: "Luces de bohemia" de Valle-Inclán.', date: '2026-09-10', pinned: true, tags: ['Lectura', 'Libros'] },
         { id: 'n2', title: 'Coordinación de Nivel - 3º ESO A', category: 'Departamento', content: 'Acuerdos sobre las lecturas y criterios de evaluación comunes.', date: '2026-09-18', pinned: false, tags: ['Departamento', 'Evaluación'] }
       ],
+      teacherSchedule: INITIAL_TEACHER_SCHEDULE,
       ccpMeetings: [
         { 
           id: 'c1', 
@@ -1321,6 +1407,7 @@
               calendarEvents: Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : INITIAL_DATA.calendarEvents,
               weeklyPlans: Array.isArray(parsed.weeklyPlans) ? parsed.weeklyPlans.filter(w => w.id !== 'w1') : [],
               notes: Array.isArray(parsed.notes) ? parsed.notes : INITIAL_DATA.notes,
+              teacherSchedule: Array.isArray(parsed.teacherSchedule) ? parsed.teacherSchedule : INITIAL_TEACHER_SCHEDULE,
               ccpMeetings: Array.isArray(parsed.ccpMeetings) ? parsed.ccpMeetings : INITIAL_DATA.ccpMeetings,
               claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
               deptMeetings: Array.isArray(parsed.deptMeetings) ? parsed.deptMeetings : INITIAL_DATA.deptMeetings,
@@ -1389,6 +1476,8 @@
         switch (currentSection) {
           case 'home':
             return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
+          case 'teacherSchedule':
+            return h(TeacherScheduleView, { schedule: data.teacherSchedule || INITIAL_TEACHER_SCHEDULE, setSchedule: s => setData({...data, teacherSchedule: s}) });
           case 'calendar':
             return h(CalendarView, { events: data.calendarEvents || [], setEvents: evts => setData({...data, calendarEvents: evts}), onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
           case 'weekly':
@@ -1410,6 +1499,7 @@
 
       const navItems = [
         { id: 'home', label: 'Inicio', icon: '🏠' },
+        { id: 'teacherSchedule', label: 'Horario Docente', icon: '🕒', badge: 'Oficial' },
         { id: 'calendar', label: 'Calendario 2026/2027', icon: '📅', badge: '2026-27' },
         { id: 'weekly', label: 'Planificador Semanal', icon: '🗓️', badge: 'Aula' },
         { id: 'groups', label: 'Grupos', icon: '🏫', badge: (data.groups || INITIAL_GROUPS).length },
@@ -1717,6 +1807,296 @@
           onGoToWeeklyPlanner,
           onClose: () => setSelectedDateForNotes(null)
         })
+      );
+    }
+
+    // --- HORARIO DOCENTE VIEW ---
+    function TeacherScheduleView({ schedule, setSchedule }) {
+      const [editingSlot, setEditingSlot] = useState(null);
+      const [editSlotText, setEditSlotText] = useState('');
+
+      const handleOpenEditSlot = (rowIdx, dayKey, currentText) => {
+        setEditingSlot({ rowIdx, dayKey });
+        setEditSlotText(currentText === '—' ? '' : currentText);
+      };
+
+      const handleSaveSlot = (e) => {
+        e.preventDefault();
+        if (!editingSlot) return;
+        const updated = [...schedule];
+        const targetRow = { ...updated[editingSlot.rowIdx] };
+        targetRow[editingSlot.dayKey] = editSlotText.trim() ? editSlotText.trim() : '—';
+        updated[editingSlot.rowIdx] = targetRow;
+        setSchedule(updated);
+        setEditingSlot(null);
+      };
+
+      const handleResetSchedule = () => {
+        if (window.confirm('¿Estás seguro/a de que deseas restaurar el horario docente oficial inicial?')) {
+          setSchedule(INITIAL_TEACHER_SCHEDULE);
+        }
+      };
+
+      const exportScheduleToWord = () => {
+        let html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><title>Horario Docente Oficial — Nuria RT 2026/2027</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h2 { color: #1E2E40; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          th, td { border: 1px solid #CBD5E1; padding: 8px 12px; text-align: center; font-size: 12px; }
+          th { background-color: #1E2E40; color: white; }
+          tr:nth-child(even) { background-color: #F8FAFC; }
+        </style>
+        </head><body>
+        <h2>Horario Docente Oficial 2026/2027</h2>
+        <p><b>Profesora:</b> Nuria RT | <b>Curso Escolar:</b> 2026/2027</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Franja Horaria</th>
+              <th>Lunes</th>
+              <th>Martes</th>
+              <th>Miércoles</th>
+              <th>Jueves</th>
+              <th>Viernes</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+        schedule.forEach(row => {
+          html += `<tr>
+            <td><b>${row.time}</b></td>
+            <td>${row.monday || '—'}</td>
+            <td>${row.tuesday || '—'}</td>
+            <td>${row.wednesday || '—'}</td>
+            <td>${row.thursday || '—'}</td>
+            <td>${row.friday || '—'}</td>
+          </tr>`;
+        });
+
+        html += `</tbody></table></body></html>`;
+
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Horario_Docente_Nuria_RT_2026_2027.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
+      const printSchedulePDF = () => {
+        const printWin = window.open('', '_blank');
+        let tableRows = '';
+        schedule.forEach(row => {
+          tableRows += `<tr>
+            <td class="time-col"><b>${row.time}</b></td>
+            <td>${row.monday || '—'}</td>
+            <td>${row.tuesday || '—'}</td>
+            <td>${row.wednesday || '—'}</td>
+            <td>${row.thursday || '—'}</td>
+            <td>${row.friday || '—'}</td>
+          </tr>`;
+        });
+
+        printWin.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Horario Docente — Nuria RT 2026/2027</title>
+            <style>
+              @page { size: A4 landscape; margin: 12mm; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 15px; color: #1E293B; }
+              .header { text-align: center; border-bottom: 2px solid #C49A45; padding-bottom: 10px; margin-bottom: 15px; }
+              .title { font-size: 20px; font-weight: bold; color: #1E2E40; margin: 0; }
+              .subtitle { font-size: 13px; color: #64748B; margin-top: 4px; }
+              table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+              th, td { border: 1px solid #CBD5E1; padding: 10px 8px; text-align: center; font-size: 11px; word-wrap: break-word; }
+              th { background-color: #1E2E40; color: #FFFFFF; font-size: 12px; font-weight: bold; }
+              .time-col { background-color: #F8FAFC; width: 120px; font-weight: bold; color: #1E2E40; }
+              tr:nth-child(even) td:not(.time-col) { background-color: #FDFBF7; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">HORARIO DOCENTE OFICIAL — CURSO 2026/2027</div>
+              <div class="subtitle">Nuria RT · «Docendo discimus»</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 120px;">Franja Horaria</th>
+                  <th>Lunes</th>
+                  <th>Martes</th>
+                  <th>Miércoles</th>
+                  <th>Jueves</th>
+                  <th>Viernes</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+            <script>window.onload = function() { window.print(); };<\/script>
+          </body>
+          </html>
+        `);
+        printWin.document.close();
+      };
+
+      const getSlotBadgeStyle = (text) => {
+        if (!text || text === '—') return { background: 'transparent', color: 'var(--text-muted)', border: 'none' };
+        if (text.includes('Guardia')) return { background: '#E2E8F0', color: '#334155', border: '1px solid #94A3B8' };
+        if (text.includes('Literatura')) return { background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' };
+        if (text.includes('4º ESO A') || text.includes('4º A')) return { background: '#EEF2FF', color: '#3730A3', border: '1px solid #A5B4FC' };
+        if (text.includes('4º ESO C') || text.includes('4º C')) return { background: '#E0F2FE', color: '#0369A1', border: '1px solid #7DD3FC' };
+        if (text.includes('1º Bachillerato')) return { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' };
+        if (text.includes('Coordinació') || text.includes('Departamento')) return { background: '#D1FAE5', color: '#065F46', border: '1px solid #34D399' };
+        if (text.includes('Recreo') || text.includes('Patio') || text.includes('Descanso')) return { background: '#FFF7ED', color: '#C2410C', border: '1px solid #FFEDD5' };
+        if (text.includes('Atención') || text.includes('OA') || text.includes('Convivència') || text.includes('Lectives')) return { background: '#F3E8FF', color: '#6B21A8', border: '1px solid #D8B4FE' };
+        return { background: 'var(--bg-card-subtle)', color: 'var(--ink-blue)', border: '1px solid var(--border-subtle)' };
+      };
+
+      const daysList = [
+        { key: 'monday', label: 'Lunes' },
+        { key: 'tuesday', label: 'Martes' },
+        { key: 'wednesday', label: 'Miércoles' },
+        { key: 'thursday', label: 'Jueves' },
+        { key: 'friday', label: 'Viernes' }
+      ];
+
+      const formatSlotText = (str) => {
+        if (!str || str === '—') return str;
+        return str
+          .replace(/4º\s+ESO\s+([A-Z])/gi, '4º\u00A0ESO\u00A0$1')
+          .replace(/1º\s+Bachillerato/gi, '1º\u00A0Bachillerato')
+          .replace(/2º\s+Bachillerato/gi, '2º\u00A0Bachillerato')
+          .replace(/1º\s*\/\s*2º/gi, '1º\u00A0/\u00A02º');
+      };
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.25rem' } },
+        h('div', { className: 'section-header' },
+          h('div', null,
+            h('h2', { className: 'section-title' }, '🕒 Horario Docente')
+          ),
+          h('div', { style: { display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' } },
+            h('button', { className: 'btn btn-secondary', onClick: exportScheduleToWord, style: { fontSize: '0.85rem' } }, '📄 Exportar Word'),
+            h('button', { className: 'btn btn-secondary', onClick: printSchedulePDF, style: { fontSize: '0.85rem' } }, '🖨️ Imprimir Horario'),
+            h('button', { className: 'btn btn-gold', onClick: handleResetSchedule, style: { fontSize: '0.85rem' } }, '🔄 Restaurar Horario Inicial')
+          )
+        ),
+
+        /* SCHEDULE TIMETABLE CARD */
+        h('div', { className: 'card', style: { padding: '1.25rem', overflowX: 'auto' } },
+          h('table', { style: { width: '100%', borderCollapse: 'collapse', textAlign: 'center', minWidth: '850px', tableLayout: 'fixed' } },
+            h('colgroup', null,
+              h('col', { style: { width: '140px' } }),
+              daysList.map(d => h('col', { key: d.key, style: { width: 'calc((100% - 140px) / 5)' } }))
+            ),
+            h('thead', null,
+              h('tr', { style: { background: 'var(--ink-blue)', color: '#FFFFFF' } },
+                h('th', { style: { padding: '0.75rem 0.85rem', borderRadius: 'var(--radius-sm) 0 0 0', fontSize: '0.85rem' } }, '🕒 Franja Horaria'),
+                daysList.map(d => h('th', { key: d.key, style: { padding: '0.75rem 0.5rem', fontSize: '0.875rem' } }, d.label))
+              )
+            ),
+            h('tbody', null,
+              schedule.map((row, rIdx) => {
+                const isPatioOrRest = row.type === 'patio' || row.type === 'rest';
+                return h('tr', {
+                  key: rIdx,
+                  style: {
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: isPatioOrRest ? '#FFFDF5' : (rIdx % 2 === 0 ? '#FFFFFF' : 'var(--bg-card-subtle)')
+                  }
+                },
+                  h('td', { style: { padding: '0.65rem 0.85rem', fontWeight: 700, fontSize: '0.8rem', color: 'var(--ink-blue)', background: 'var(--bg-card-subtle)', borderRight: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' } }, row.time),
+                  daysList.map(d => {
+                    const text = row[d.key] || '—';
+                    const badgeStyle = getSlotBadgeStyle(text);
+                    const formattedText = formatSlotText(text);
+                    return h('td', {
+                      key: d.key,
+                      onClick: () => handleOpenEditSlot(rIdx, d.key, text),
+                      style: {
+                        padding: '0.55rem 0.45rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      },
+                      title: 'Haz clic para editar esta franja'
+                    },
+                      text !== '—' ? h('div', {
+                        style: {
+                          padding: '0.4rem 0.55rem',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.775rem',
+                          fontWeight: 600,
+                          lineHeight: 1.35,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                          ...badgeStyle
+                        }
+                      }, formattedText) : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.85rem' } }, '—')
+                    );
+                  })
+                );
+              })
+            )
+          )
+        ),
+
+        /* MODAL FOR EDITING SLOT */
+        editingSlot && h('div', { className: 'modal-overlay' },
+          h('div', { className: 'modal-content', style: { maxWidth: '520px' }, onClick: e => e.stopPropagation() },
+            h('div', { className: 'modal-header' },
+              h('div', null,
+                h('h3', { style: { fontSize: '1.15rem', color: 'var(--ink-blue)' } }, 'Editar Franja del Horario'),
+                h('span', { className: 'badge badge-gold' }, `${daysList.find(d => d.key === editingSlot.dayKey)?.label} (${schedule[editingSlot.rowIdx]?.time})`)
+              ),
+              h('button', { onClick: () => setEditingSlot(null), style: { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1.2rem' } }, '✕')
+            ),
+            h('form', { onSubmit: handleSaveSlot },
+              h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
+                h('div', { className: 'form-group' },
+                  h('label', { className: 'form-label' }, 'Asignatura / Actividad / Guardia'),
+                  h('input', {
+                    className: 'form-control',
+                    autoFocus: true,
+                    value: editSlotText,
+                    onChange: e => setEditSlotText(e.target.value),
+                    placeholder: 'Ej. Lengua Castellana 4º ESO A, Guardia de Patio...'
+                  })
+                ),
+                h('div', { style: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' } },
+                  h('span', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', width: '100%', marginBottom: '0.2rem' } }, 'Plantillas rápidas:'),
+                  [
+                    'Lengua Castellana 4º ESO A',
+                    'Lengua Castellana 4º ESO C',
+                    'Lengua Castellana 1º Bachillerato Científico',
+                    'Literatura Universal 1º / 2º Bachillerato',
+                    'Guardia de Patio',
+                    'Coordinació Didàctica (L)',
+                    'Reunión Convivència',
+                    'Atención Familias',
+                    'Reunión Departamento (Castellano)',
+                    '— (Libre)'
+                  ].map(preset => h('button', {
+                    type: 'button',
+                    key: preset,
+                    className: 'btn btn-secondary',
+                    style: { padding: '0.2rem 0.45rem', fontSize: '0.725rem' },
+                    onClick: () => setEditSlotText(preset === '— (Libre)' ? '' : preset)
+                  }, preset))
+                )
+              ),
+              h('div', { className: 'modal-footer' },
+                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setEditingSlot(null) }, 'Cancelar'),
+                h('button', { type: 'submit', className: 'btn btn-primary' }, 'Guardar Cambios')
+              )
+            )
+          )
+        )
       );
     }
 
