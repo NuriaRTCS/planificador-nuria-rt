@@ -2456,8 +2456,10 @@
             const dayEvt = (calendarEvents || []).find(e => e.date === dayDateISO);
 
             const isWithinSchoolYear = (dayDateISO >= '2026-09-09' && dayDateISO <= '2027-06-18');
-
             const tag = dayEvt?.tag;
+            const isNonSchoolDay = (tag === 'festivo' || tag === 'no_lectivo');
+            const isProgrammableDay = isWithinSchoolYear && !isNonSchoolDay;
+
             let cardBackground = 'var(--bg-card)';
             let cardBorder = '1px solid var(--border-color)';
             let tagBadge = null;
@@ -2466,12 +2468,12 @@
               cardBackground = '#FAF9F6';
               cardBorder = '1px dashed #CBD5E1';
             } else if (tag === 'festivo') {
-              cardBackground = '#EFF6FF';
-              cardBorder = '2px solid #2563EB';
+              cardBackground = '#FEF2F2';
+              cardBorder = '2px solid #EF4444';
               tagBadge = h('span', { className: 'badge', style: { background: 'var(--tag-festivo-bg)', color: 'var(--tag-festivo-text)', fontSize: '0.625rem', padding: '0.15rem 0.4rem', fontWeight: 700 } }, '🎉 Festivo');
             } else if (tag === 'no_lectivo') {
-              cardBackground = '#F8FAFC';
-              cardBorder = '2px solid #64748B';
+              cardBackground = '#FFFBEB';
+              cardBorder = '2px solid #F59E0B';
               tagBadge = h('span', { className: 'badge', style: { background: 'var(--tag-no-lectivo-bg)', color: 'var(--tag-no-lectivo-text)', fontSize: '0.625rem', padding: '0.15rem 0.4rem', fontWeight: 700 } }, '🛑 No Lectivo');
             } else if (tag === 'evaluacion') {
               cardBorder = '2px solid #16A34A';
@@ -2488,10 +2490,10 @@
               key: d.key,
               className: 'card',
               onClick: () => {
-                if (isWithinSchoolYear) setSelectedDayKey(d.key);
+                if (isProgrammableDay) setSelectedDayKey(d.key);
               },
               style: {
-                cursor: isWithinSchoolYear ? 'pointer' : 'default',
+                cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default'),
                 padding: '0.85rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2511,7 +2513,7 @@
                     ),
                     h('span', { style: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold-accent)' } }, dayDateFormatted)
                   ),
-                  isWithinSchoolYear ? h('span', { className: 'badge badge-gold', style: { fontSize: '0.625rem', padding: '0.15rem 0.35rem' } }, 'Programar ✍️') : h('span', { style: { fontSize: '0.625rem', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Sin lectiva')
+                  isProgrammableDay ? h('span', { className: 'badge badge-gold', style: { fontSize: '0.625rem', padding: '0.15rem 0.35rem' } }, 'Programar ✍️') : (isNonSchoolDay ? h('span', { className: 'badge', style: { background: '#FEE2E2', color: '#991B1B', fontSize: '0.625rem', padding: '0.15rem 0.35rem', fontWeight: 700 } }, '🚫 No Lectivo') : h('span', { style: { fontSize: '0.625rem', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Sin lectiva'))
                 ),
 
                 /* IF OUTSIDE SCHOOL YEAR: LEAVE COMPLETELY BLANK */
@@ -2519,8 +2521,9 @@
                   /* SPECIAL BANNER FOR FESTIVO / NO LECTIVO DAYS */
                   (tag === 'festivo' || tag === 'no_lectivo') && h('div', {
                     style: {
-                      background: tag === 'festivo' ? 'var(--tag-festivo-bg)' : 'var(--tag-no-lectivo-bg)',
-                      color: tag === 'festivo' ? 'var(--tag-festivo-text)' : 'var(--tag-no-lectivo-text)',
+                      background: tag === 'festivo' ? '#FEE2E2' : '#FEF3C7',
+                      color: tag === 'festivo' ? '#991B1B' : '#92400E',
+                      border: tag === 'festivo' ? '1px solid #FCA5A5' : '1px solid #FCD34D',
                       padding: '0.55rem 0.65rem',
                       borderRadius: 'var(--radius-md)',
                       textAlign: 'center',
@@ -2529,7 +2532,7 @@
                       marginBottom: '0.65rem',
                       boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
                     }
-                  }, tag === 'festivo' ? `🎉 FESTIVO ${dayEvt?.title ? `— ${dayEvt.title}` : ''}` : `🛑 NO LECTIVO ${dayEvt?.title ? `— ${dayEvt.title}` : ''}`),
+                  }, tag === 'festivo' ? `🎉 FESTIVO ${dayEvt?.title ? `— ${dayEvt.title}` : (dayEvt?.details ? `— ${dayEvt.details}` : '')}` : `🛑 NO LECTIVO ${dayEvt?.title ? `— ${dayEvt.title}` : (dayEvt?.details ? `— ${dayEvt.details}` : '')}`),
 
                   h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.4rem' } },
                     timeSlotsList.map(slot => {
@@ -2542,7 +2545,7 @@
 
                       const handleSlotClick = (e) => {
                         e.stopPropagation();
-                        if (isWithinSchoolYear) {
+                        if (isProgrammableDay) {
                           setSelectedSlotTarget({
                             dayKey: d.key,
                             dayName: d.label,
@@ -2561,16 +2564,16 @@
                             key: slot.time,
                             className: 'slot-row slot-patio-empty',
                             onClick: handleSlotClick,
-                            style: { minHeight: '26px', background: 'transparent', border: 'none', marginBottom: '0.35rem', cursor: isWithinSchoolYear ? 'pointer' : 'default' },
-                            title: 'Haz clic para programar esta hora'
+                            style: { minHeight: '26px', background: 'transparent', border: 'none', marginBottom: '0.35rem', cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default') },
+                            title: isProgrammableDay ? 'Haz clic para programar esta hora' : (isNonSchoolDay ? 'Día festivo o no lectivo — Programación desactivada' : '')
                           });
                         }
                         return h('div', {
                           key: slot.time,
                           className: 'slot-row slot-empty',
                           onClick: handleSlotClick,
-                          style: { minHeight: '52px', background: 'transparent', border: 'none', marginBottom: '0.35rem', cursor: isWithinSchoolYear ? 'pointer' : 'default' },
-                          title: 'Haz clic para programar esta hora'
+                          style: { minHeight: '52px', background: 'transparent', border: 'none', marginBottom: '0.35rem', cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default') },
+                          title: isProgrammableDay ? 'Haz clic para programar esta hora' : (isNonSchoolDay ? 'Día festivo o no lectivo — Programación desactivada' : '')
                         });
                       }
 
@@ -2581,8 +2584,8 @@
                           key: slot.time,
                           className: 'slot-row slot-patio',
                           onClick: handleSlotClick,
-                          style: { display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'center', cursor: isWithinSchoolYear ? 'pointer' : 'default' },
-                          title: 'Haz clic para editar esta hora'
+                          style: { display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'center', cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default') },
+                          title: isProgrammableDay ? 'Haz clic para editar esta hora' : (isNonSchoolDay ? 'Día festivo o no lectivo — Programación desactivada' : '')
                         },
                           h('div', { style: { fontSize: '0.7rem', fontWeight: 700 } }, `${slot.label} (${slot.time})`),
                           displayActivity && h('div', { style: { fontSize: '0.675rem', padding: '0.15rem 0.4rem', borderRadius: '4px', marginTop: '0.1rem', ...badgeStyle } }, displayActivity)
@@ -2593,8 +2596,8 @@
                         key: slot.time,
                         className: 'slot-row',
                         onClick: handleSlotClick,
-                        style: { cursor: isWithinSchoolYear ? 'pointer' : 'default' },
-                        title: 'Haz clic para programar esta hora'
+                        style: { cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default') },
+                        title: isProgrammableDay ? 'Haz clic para programar esta hora' : (isNonSchoolDay ? 'Día festivo o no lectivo — Programación desactivada' : '')
                       },
                         h('div', { className: 'slot-time-badge' },
                           h('span', null, `${slot.label} (${slot.time})`),
@@ -2628,7 +2631,7 @@
                   )
                 )
               ),
-              isWithinSchoolYear ? h('div', { style: { fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid var(--border-subtle)' } }, 'Haz clic para programar') : null
+              isProgrammableDay ? h('div', { style: { fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid var(--border-subtle)' } }, 'Haz clic para programar') : (isNonSchoolDay ? h('div', { style: { fontSize: '0.7rem', color: '#991B1B', textAlign: 'center', marginTop: '0.5rem', paddingTop: '0.35rem', borderTop: '1px solid #FCA5A5', fontWeight: 700 } }, '🔒 Día No Lectivo / Festivo') : null)
             );
           })
         ),
