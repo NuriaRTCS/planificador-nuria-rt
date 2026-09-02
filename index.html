@@ -1075,15 +1075,28 @@
       return (val === '—' || val === '-') ? '' : val;
     }
 
+    function sanitizeTeacherSchedule(scheduleList) {
+      if (!Array.isArray(scheduleList) || scheduleList.length === 0) return INITIAL_TEACHER_SCHEDULE;
+      const daysKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      return scheduleList.map(row => {
+        const updatedRow = { ...row };
+        daysKeys.forEach(dk => {
+          if (typeof updatedRow[dk] === 'string') {
+            updatedRow[dk] = updatedRow[dk].replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal');
+          }
+        });
+        return updatedRow;
+      });
+    }
+
     function formatPlannerText(str) {
       if (!str || str === '—') return str;
       return str
+        .replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal')
         .replace(/Lengua Castellana/gi, 'LC')
-        .replace(/Literatura Universal/gi, 'LU')
         .replace(/4º\s+ESO\s+([A-Z])/gi, '4º\u00A0ESO\u00A0$1')
         .replace(/1º\s+Bachillerato/gi, '1º\u00A0Bachillerato')
-        .replace(/2º\s+Bachillerato/gi, '2º\u00A0Bachillerato')
-        .replace(/1º\s*\/\s*2º/gi, '1º\u00A0/\u00A02º');
+        .replace(/2º\s+Bachillerato/gi, '2º\u00A0Bachillerato');
     }
 
     // --- INITIAL TEACHER SCHEDULE DATA ---
@@ -1102,7 +1115,7 @@
         type: 'class',
         monday: '—',
         tuesday: 'Lengua Castellana 1º Bachillerato Científico',
-        wednesday: 'Literatura Universal 1º / 2º Bachillerato',
+        wednesday: 'Literatura Universal',
         thursday: 'Reunión Convivència',
         friday: 'Lengua Castellana 1º Bachillerato Científico'
       },
@@ -1112,7 +1125,7 @@
         monday: '—',
         tuesday: 'Coordinació Didàctica (L)',
         wednesday: 'Coordinació Didàctica (L)',
-        thursday: 'Literatura Universal 1º / 2º Bachillerato',
+        thursday: 'Literatura Universal',
         friday: 'Lectives Autoritzades'
       },
       {
@@ -1140,12 +1153,12 @@
         tuesday: '—',
         wednesday: 'OA - Conflictes',
         thursday: 'OA - Conflictes',
-        friday: 'Literatura Universal 1º / 2º Bachillerato'
+        friday: 'Literatura Universal'
       },
       {
         time: '13:00 – 13:55',
         type: 'class',
-        monday: 'Literatura Universal 1º / 2º Bachillerato',
+        monday: 'Literatura Universal',
         tuesday: '—',
         wednesday: '—',
         thursday: 'Lengua Castellana 1º Bachillerato Científico',
@@ -1488,7 +1501,7 @@
                 calendarEvents: Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : INITIAL_DATA.calendarEvents,
                 weeklyPlans: Array.isArray(parsed.weeklyPlans) ? parsed.weeklyPlans.filter(w => w && w.id !== 'w1') : [],
                 notes: Array.isArray(parsed.notes) ? parsed.notes : INITIAL_DATA.notes,
-                teacherSchedule: (Array.isArray(parsed.teacherSchedule) && parsed.teacherSchedule.length > 0) ? parsed.teacherSchedule : INITIAL_TEACHER_SCHEDULE,
+                teacherSchedule: (Array.isArray(parsed.teacherSchedule) && parsed.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(parsed.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
                 ccpMeetings: Array.isArray(parsed.ccpMeetings) ? parsed.ccpMeetings : INITIAL_DATA.ccpMeetings,
                 claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
                 deptMeetings: Array.isArray(parsed.deptMeetings) ? parsed.deptMeetings : INITIAL_DATA.deptMeetings,
@@ -1688,8 +1701,9 @@
       const dayNameEs = `${dayNameCapitalized}, ${dateFormattedDDMMYYYY}`;
       const currentDayKey = dayNames[today.getDay()];
 
-      const currentWeek = (data.weeklyPlans && data.weeklyPlans[0]) || {};
-      const todayDayInfo = currentWeek.days?.[currentDayKey] || {};
+      const currentMondayStr = getMondayOfDate(today);
+      const activeWeek = (data.weeklyPlans || []).find(w => w.startDate === currentMondayStr) || {};
+      const todayDayInfo = activeWeek.days?.[currentDayKey] || {};
       const todaySlots = todayDayInfo.slots || {};
       const todaySlotKeys = Object.keys(todaySlots);
 
@@ -1774,28 +1788,72 @@
               (() => {
                 const teacherSched = data.teacherSchedule || INITIAL_TEACHER_SCHEDULE;
                 const timeSlotsToday = getTimeSlotsForDay(currentDayKey);
+                
+                const now = new Date();
+                const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
                 const todayCombined = timeSlotsToday.map(slot => {
                   const item = todaySlots[slot.time] || {};
                   const official = getScheduleActivity(teacherSched, currentDayKey, slot.time);
-                  return { slot, item, official };
+                  
+                  // Calculate time status (current, future, past)
+                  const times = (slot.time || '').split('-').map(s => s.trim());
+                  const [sH, sM] = (times[0] || '08:00').split(':').map(Number);
+                  const [eH, eM] = (times[1] || times[0] || '08:55').split(':').map(Number);
+                  const startMins = sH * 60 + sM;
+                  const endMins = eH * 60 + eM;
+
+                  let status = 'future';
+                  if (nowTotalMins > endMins) status = 'past';
+                  else if (nowTotalMins >= startMins && nowTotalMins <= endMins) status = 'current';
+
+                  return { slot, item, official, status, startMins, endMins };
                 }).filter(x => x.official || x.item.subject || (x.item.blocks && x.item.blocks.length > 0));
 
-                return todayCombined.length > 0 ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' } },
-                  todayCombined.map(({ slot, item, official }) => {
+                // Sort: Active/Future slots FIRST (in chronological order), Past slots AT THE END
+                const activeOrFuture = todayCombined.filter(x => x.status !== 'past');
+                const pastSlots = todayCombined.filter(x => x.status === 'past');
+                const sortedCombined = [...activeOrFuture, ...pastSlots];
+
+                return sortedCombined.length > 0 ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '240px', overflowY: 'auto' } },
+                  sortedCombined.map(({ slot, item, official, status }) => {
                     const blocks = item.blocks || [];
                     const badgeStyle = getSlotBadgeStyle(official);
-                    return h('div', { key: slot.time, style: { background: 'var(--bg-card-subtle)', padding: '0.45rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
-                      h('div', { style: { display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
-                        h('span', null, slot.time),
-                        official ? h('span', { style: { padding: '0.15rem 0.35rem', borderRadius: '4px', fontSize: '0.725rem', ...badgeStyle } }, formatPlannerText(official)) : h('span', { style: { color: 'var(--gold-accent)' } }, `${item.subject} (${item.group})`)
+
+                    const isCurrent = status === 'current';
+                    const isPast = status === 'past';
+
+                    return h('div', {
+                      key: slot.time,
+                      style: {
+                        background: isCurrent ? '#EFF6FF' : (isPast ? '#F8FAFC' : 'var(--bg-card-subtle)'),
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: isCurrent ? '2px solid #3B82F6' : (isPast ? '1px dashed #CBD5E1' : '1px solid var(--border-subtle)'),
+                        fontSize: '0.8rem',
+                        opacity: isPast ? 0.65 : 1,
+                        boxShadow: isCurrent ? '0 2px 8px rgba(59, 130, 246, 0.15)' : 'none'
+                      }
+                    },
+                      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.2rem' } },
+                        h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.35rem' } },
+                          h('span', null, slot.time),
+                          isCurrent && h('span', { className: 'badge', style: { background: '#EF4444', color: '#FFFFFF', fontSize: '0.65rem', padding: '0.1rem 0.35rem' } }, '🔴 EN CURSO'),
+                          isPast && h('span', { className: 'badge', style: { background: '#E2E8F0', color: '#64748B', fontSize: '0.65rem', padding: '0.1rem 0.35rem' } }, '✓ Finalizada')
+                        ),
+                        official ? h('span', { style: { padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.725rem', ...badgeStyle } }, formatPlannerText(official)) : (item.subject ? h('span', { style: { color: 'var(--gold-accent)' } }, `${item.subject} (${item.group || ''})`) : null)
                       ),
-                      blocks.map((blk, bIdx) => {
-                        const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
-                        return h('div', { key: bIdx, style: { display: 'flex', gap: '0.3rem', alignItems: 'center', margin: '0.15rem 0' } },
-                          lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}` }, lessonObj.label),
-                          h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600 } }, blk.text)
-                        );
-                      })
+
+                      /* RENDER PROGRAMMED WORK BLOCKS */
+                      blocks.length > 0 ? h('div', { style: { marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+                        blocks.map((blk, bIdx) => {
+                          const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
+                          return h('div', { key: bIdx, style: { display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.775rem' } },
+                            lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem' } }, lessonObj.label),
+                            h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600 } }, blk.text)
+                          );
+                        })
+                      ) : (official ? h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.15rem' } }, 'Sin bloques específicos de aula') : null)
                     );
                   })
                 ) : h('div', { style: { textAlign: 'center', padding: '1rem 0.5rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' } },
@@ -2665,9 +2723,32 @@
       const [subject, setSubject] = useState(slotData.subject || '');
       const [group, setGroup] = useState(slotData.group || '');
       const [blocks, setBlocks] = useState(slotData.blocks || []);
+      const [copiedBlock, setCopiedBlock] = useState(() => {
+        try {
+          const saved = localStorage.getItem('planificador_copied_block');
+          return saved ? JSON.parse(saved) : null;
+        } catch (e) {
+          return null;
+        }
+      });
+      const [copySuccessMsg, setCopySuccessMsg] = useState('');
 
       const handleAddBlock = () => {
         setBlocks([...blocks, { type: 'explicacion', text: '' }]);
+      };
+
+      const handleCopyBlock = (blk) => {
+        try {
+          localStorage.setItem('planificador_copied_block', JSON.stringify(blk));
+          setCopiedBlock(blk);
+          setCopySuccessMsg('📋 ¡Bloque copiado al portapapeles!');
+          setTimeout(() => setCopySuccessMsg(''), 2500);
+        } catch (e) {}
+      };
+
+      const handlePasteBlock = () => {
+        if (!copiedBlock) return;
+        setBlocks([...blocks, { type: copiedBlock.type || 'explicacion', text: copiedBlock.text || '' }]);
       };
 
       const handleBlockChange = (bIdx, field, value) => {
@@ -2679,11 +2760,6 @@
 
       const handleRemoveBlock = (bIdx) => {
         setBlocks(blocks.filter((_, idx) => idx !== bIdx));
-      };
-
-      const handleImportOfficial = () => {
-        if (!officialActivity) return;
-        setSubject(officialActivity);
       };
 
       const handleClearSlot = () => {
@@ -2700,7 +2776,7 @@
       const officialBadgeStyle = getSlotBadgeStyle(officialActivity);
 
       return h('div', { className: 'modal-overlay' },
-        h('div', { className: 'modal-content', style: { maxWidth: '560px' }, onClick: e => e.stopPropagation() },
+        h('div', { className: 'modal-content', style: { maxWidth: '580px' }, onClick: e => e.stopPropagation() },
           h('div', { className: 'modal-header' },
             h('div', null,
               h('h3', { style: { fontSize: '1.15rem', color: 'var(--ink-blue)', lineHeight: 1.2 } }, `Programar ${label} (${timeStr})`),
@@ -2723,49 +2799,44 @@
                   ...officialBadgeStyle
                 }
               },
-                h('span', null, `📌 Horario Oficial: ${officialDisplay}`),
-                !subject && h('button', {
-                  type: 'button',
-                  className: 'btn btn-secondary',
-                  style: { padding: '0.15rem 0.45rem', fontSize: '0.725rem', background: '#FFFFFF', color: 'var(--ink-blue)' },
-                  onClick: handleImportOfficial
-                }, 'Usar como asignatura')
+                h('span', null, `📌 Horario Oficial: ${officialDisplay}`)
               ) : null,
 
-              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' } },
-                h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                  h('label', { className: 'form-label' }, 'Asignatura / Actividad'),
-                  h('input', {
-                    className: 'form-control',
-                    value: subject,
-                    onChange: e => setSubject(e.target.value),
-                    placeholder: 'Ej. Lengua Castellana, LU...'
-                  })
-                ),
-                h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                  h('label', { className: 'form-label' }, 'Grupo / Curso'),
-                  h('input', {
-                    className: 'form-control',
-                    value: group,
-                    onChange: e => setGroup(e.target.value),
-                    placeholder: 'Ej. 4º ESO A, 1º Bach...'
-                  })
-                )
-              ),
+              copySuccessMsg && h('div', {
+                style: {
+                  background: '#DCFCE7',
+                  color: '#15803D',
+                  border: '1px solid #86EFAC',
+                  padding: '0.4rem 0.75rem',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  textAlign: 'center'
+                }
+              }, copySuccessMsg),
 
               h('div', { style: { marginTop: '0.35rem' } },
-                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' } },
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.35rem' } },
                   h('label', { className: 'form-label', style: { marginBottom: 0 } }, 'Bloques de Trabajo de la Sesión'),
-                  h('button', {
-                    type: 'button',
-                    className: 'btn btn-gold',
-                    style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem' },
-                    onClick: handleAddBlock
-                  }, '➕ Añadir Bloque')
+                  h('div', { style: { display: 'flex', gap: '0.35rem' } },
+                    copiedBlock && h('button', {
+                      type: 'button',
+                      className: 'btn btn-secondary',
+                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: 'var(--ink-blue)', borderColor: '#93C5FD', background: '#EFF6FF', fontWeight: 600 },
+                      onClick: handlePasteBlock,
+                      title: `Pegar bloque copiado: "${copiedBlock.text || 'Sin texto'}"`
+                    }, '📋 Pegar Bloque Copiado'),
+                    h('button', {
+                      type: 'button',
+                      className: 'btn btn-gold',
+                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem' },
+                      onClick: handleAddBlock
+                    }, '➕ Añadir Bloque')
+                  )
                 ),
-                blocks.length === 0 ? h('div', { style: { padding: '0.75rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque".') :
+                blocks.length === 0 ? h('div', { style: { padding: '0.85rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque"' + (copiedBlock ? ' o en "📋 Pegar Bloque Copiado".' : '.')) :
                 h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem' } },
-                  blocks.map((blk, bIdx) => h('div', { key: bIdx, style: { display: 'flex', gap: '0.4rem', alignItems: 'center' } },
+                  blocks.map((blk, bIdx) => h('div', { key: bIdx, style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
                     h('select', {
                       className: 'form-control',
                       style: { width: '130px', padding: '0.35rem', fontSize: '0.775rem' },
@@ -2781,6 +2852,12 @@
                       value: blk.text || '',
                       onChange: e => handleBlockChange(bIdx, 'text', e.target.value)
                     }),
+                    h('button', {
+                      type: 'button',
+                      onClick: () => handleCopyBlock(blk),
+                      style: { border: 'none', background: 'none', color: 'var(--ink-blue)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                      title: 'Copiar este bloque de trabajo para pegarlo en otra sesión'
+                    }, '📋'),
                     h('button', {
                       type: 'button',
                       onClick: () => handleRemoveBlock(bIdx),
