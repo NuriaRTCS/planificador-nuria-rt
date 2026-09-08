@@ -1146,9 +1146,9 @@
         return { background: '#DCFCE7', color: '#15803D', border: '1px solid #4ADE80' };
       }
 
-      // 4. Lengua Castellana 1º BAT General/Científico -> Azul eléctrico
-      if (/1[ºª]?\s*(bach|bat)\b|\blc\s*1[ºª]?/i.test(t)) {
-        return { background: '#DBEAFE', color: '#1E40AF', border: '1px solid #3B82F6' };
+      // 4. Lengua Castellana 1º BAT General/Científico -> Turquesa / Cian fresco
+      if (/1[ºª]?\s*(bachillerato|bach|bat)\b|cientí|cienti|\blc\s*1[ºª]?/i.test(t)) {
+        return { background: '#CFFAFE', color: '#0E7490', border: '1px solid #06B6D4' };
       }
 
       // 5. Atenció famílies / Lectives Autoritzades / OA – Conflictes / Reunión Convivència -> Morado
@@ -1161,14 +1161,15 @@
         return { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' };
       }
 
-      // 7. Guàrdia de PATI / Guàrdia de BIBLIOTECA -> Gris
-      if (/guardia|guàrdia|pati\b|biblioteca/i.test(t)) {
-        return { background: '#F1F5F9', color: '#334155', border: '1px solid #94A3B8' };
-      }
-
-      // 8. Recreos / Descanso -> Gris suave
-      if (/recreo|descanso/i.test(t)) {
-        return { background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' };
+      // 7. Guàrdies (Guàrdia de Pati / Guàrdia de Biblioteca) y Recreos / Descanso (Líneas 10:45 y 13:55 comparten el mismo color gris)
+      if (/guardia|guàrdia|pati\b|biblioteca|recreo|descanso/i.test(t)) {
+        const isGuard = /guardia|guàrdia/i.test(t);
+        return {
+          background: '#E2E8F0',
+          color: '#334155',
+          border: '1.5px solid #94A3B8',
+          fontWeight: isGuard ? 800 : 600
+        };
       }
 
       // Fallback for any other custom text
@@ -1195,12 +1196,17 @@
         const updatedRow = { ...row };
         daysKeys.forEach(dk => {
           if (typeof updatedRow[dk] === 'string') {
-            updatedRow[dk] = updatedRow[dk].replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal');
+            updatedRow[dk] = updatedRow[dk]
+              .replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal')
+              .replace(/Atenci[oó]n\s*Familias/gi, 'Atenció famílies')
+              .replace(/Guardia de Patio/gi, 'Guàrdia de Pati')
+              .replace(/Guardia de Biblioteca/gi, 'Guàrdia de Biblioteca');
           }
         });
         if (updatedRow.time === '10:45 – 11:10') {
-          if (updatedRow.wednesday === 'Patio / Biblioteca') updatedRow.wednesday = 'Guardia de Biblioteca';
-          if (updatedRow.thursday === 'Recreo') updatedRow.thursday = 'Guardia de Biblioteca';
+          if (updatedRow.wednesday === 'Patio / Biblioteca' || updatedRow.wednesday === 'Guardia de Patio') updatedRow.wednesday = 'Guàrdia de Pati';
+          if (updatedRow.tuesday === 'Guardia de Patio') updatedRow.tuesday = 'Guàrdia de Pati';
+          if (updatedRow.thursday === 'Recreo' || updatedRow.thursday === 'Guardia de Biblioteca') updatedRow.thursday = 'Guàrdia de Biblioteca';
         }
         if (updatedRow.time === '13:55 – 14:05') {
           if (updatedRow.thursday === 'Descanso') updatedRow.thursday = '—';
@@ -1306,15 +1312,15 @@
         time: '10:45 – 11:10',
         type: 'patio',
         monday: 'Recreo',
-        tuesday: 'Guardia de Patio',
-        wednesday: 'Guardia de Biblioteca',
-        thursday: 'Guardia de Biblioteca',
+        tuesday: 'Guàrdia de Pati',
+        wednesday: 'Guàrdia de Pati',
+        thursday: 'Guàrdia de Biblioteca',
         friday: 'Recreo'
       },
       {
         time: '11:10 – 12:05',
         type: 'class',
-        monday: 'Atención Familias',
+        monday: 'Atenció famílies',
         tuesday: '—',
         wednesday: 'Lectives Autoritzades',
         thursday: 'Lengua Castellana 4º ESO C',
@@ -2403,14 +2409,15 @@
                   key: rIdx,
                   style: {
                     borderBottom: '1px solid var(--border-subtle)',
-                    background: isPatioOrRest ? '#FFFDF5' : (rIdx % 2 === 0 ? '#FFFFFF' : 'var(--bg-card-subtle)')
+                    background: isPatioOrRest ? '#F8FAFC' : (rIdx % 2 === 0 ? '#FFFFFF' : 'var(--bg-card-subtle)')
                   }
                 },
-                  h('td', { style: { padding: '0.65rem 0.85rem', fontWeight: 700, fontSize: '0.8rem', color: 'var(--ink-blue)', background: 'var(--bg-card-subtle)', borderRight: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' } }, row.time),
+                  h('td', { style: { padding: '0.65rem 0.85rem', fontWeight: 700, fontSize: '0.8rem', color: '#334155', background: isPatioOrRest ? '#E2E8F0' : 'var(--bg-card-subtle)', borderRight: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' } }, row.time),
                   daysList.map(d => {
                     const text = row[d.key] || '—';
                     const badgeStyle = getSlotBadgeStyle(text);
                     const formattedText = formatSlotText(text);
+                    const isGuard = /guardia|guàrdia/i.test(text);
                     return h('td', {
                       key: d.key,
                       onClick: () => handleOpenEditSlot(rIdx, d.key, text),
@@ -2426,12 +2433,12 @@
                           padding: '0.4rem 0.55rem',
                           borderRadius: 'var(--radius-sm)',
                           fontSize: '0.775rem',
-                          fontWeight: 600,
+                          fontWeight: isGuard ? 800 : 600,
                           lineHeight: 1.35,
                           boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                           ...badgeStyle
                         }
-                      }, formattedText) : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.85rem' } }, '—')
+                      }, isGuard ? h('strong', { style: { fontWeight: 800 } }, formattedText) : formattedText) : h('span', { style: { color: 'var(--text-muted)', fontSize: '0.85rem' } }, '—')
                     );
                   })
                 );
@@ -2468,11 +2475,12 @@
                     'Lengua Castellana 4º ESO A',
                     'Lengua Castellana 4º ESO C',
                     'Lengua Castellana 1º Bachillerato Científico',
-                    'Literatura Universal 1º / 2º Bachillerato',
-                    'Guardia de Patio',
+                    'Literatura Universal',
+                    'Guàrdia de Pati',
+                    'Guàrdia de Biblioteca',
                     'Coordinació Didàctica (L)',
                     'Reunión Convivència',
-                    'Atención Familias',
+                    'Atenció famílies',
                     'Reunión Departamento (Castellano)',
                     '— (Libre)'
                   ].map(preset => h('button', {
