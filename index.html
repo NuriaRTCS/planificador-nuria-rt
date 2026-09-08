@@ -46,6 +46,8 @@
       --tag-ccp-text: #854D0E;
       --tag-claustro-bg: #FAE8FF;
       --tag-claustro-text: #A21CAF;
+      --tag-otras-reuniones-bg: #CFFAFE;
+      --tag-otras-reuniones-text: #0E7490;
 
       --lesson-explicacion-bg: #DCFCE7;
       --lesson-explicacion-text: #15803D;
@@ -419,6 +421,7 @@
     .month-day-cell.tag-evaluacion, .mini-cal-cell.tag-evaluacion { background: var(--tag-evaluacion-bg) !important; color: var(--tag-evaluacion-text) !important; font-weight: 700; }
     .month-day-cell.tag-ccp, .mini-cal-cell.tag-ccp { background: var(--tag-ccp-bg) !important; color: var(--tag-ccp-text) !important; font-weight: 700; }
     .month-day-cell.tag-claustro, .mini-cal-cell.tag-claustro { background: var(--tag-claustro-bg) !important; color: var(--tag-claustro-text) !important; font-weight: 700; }
+    .month-day-cell.tag-otras_reuniones, .mini-cal-cell.tag-otras_reuniones { background: var(--tag-otras-reuniones-bg) !important; color: var(--tag-otras-reuniones-text) !important; font-weight: 700; }
 
     .month-day-cell.weekend-default, .mini-cal-cell.weekend-default { background: #FEE2E2 !important; color: #991B1B !important; font-weight: 700; }
 
@@ -452,6 +455,9 @@
       border: 1px solid var(--border-subtle);
       margin-bottom: 0.35rem;
       transition: all 0.15s ease;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
     }
 
     .slot-row.slot-patio {
@@ -845,6 +851,113 @@
       });
     }
 
+    function sanitizeCalendarEvents(eventsList) {
+      const list = Array.isArray(eventsList) ? [...eventsList] : [];
+      const requiredNoLectivo = [
+        { id: 'nl_oct_5', date: '2026-10-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_6', date: '2026-10-06', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_7', date: '2026-10-07', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_8', date: '2026-10-08', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_22', date: '2026-12-22', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_23', date: '2026-12-23', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_24', date: '2026-12-24', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_28', date: '2026-12-28', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_29', date: '2026-12-29', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_30', date: '2026-12-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_31', date: '2026-12-31', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_ene_4', date: '2027-01-04', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_ene_5', date: '2027-01-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_mar_25', date: '2027-03-25', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_mar_30', date: '2027-03-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_mar_31', date: '2027-03-31', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_1', date: '2027-04-01', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_2', date: '2027-04-02', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_5', date: '2027-04-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_21', date: '2027-06-21', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_22', date: '2027-06-22', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_23', date: '2027-06-23', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_24', date: '2027-06-24', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_25', date: '2027-06-25', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_28', date: '2027-06-28', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_29', date: '2027-06-29', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_30', date: '2027-06-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' }
+      ];
+
+      const requiredFestivos = [
+        { id: 'f_oct_9', date: '2026-10-09', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_oct_12', date: '2026-10-12', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_nov_1', date: '2026-11-01', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_dic_6', date: '2026-12-06', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_dic_8', date: '2026-12-08', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_dic_25', date: '2026-12-25', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_ene_1', date: '2027-01-01', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_ene_6', date: '2027-01-06', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_mar_19', date: '2027-03-19', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_mar_26', date: '2027-03-26', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_mar_29', date: '2027-03-29', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_may_1', date: '2027-05-01', title: '', type: 'festivo', tag: 'festivo', details: '' }
+      ];
+
+      requiredNoLectivo.forEach(req => {
+        const existingIdx = list.findIndex(e => e && e.date === req.date);
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], type: 'vacaciones', tag: 'no_lectivo', title: '', details: '' };
+          delete list[existingIdx].time;
+        } else {
+          list.push(req);
+        }
+      });
+
+      requiredFestivos.forEach(req => {
+        const existingIdx = list.findIndex(e => e && e.date === req.date);
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], type: 'festivo', tag: 'festivo', title: '', details: '' };
+          delete list[existingIdx].time;
+        } else {
+          list.push(req);
+        }
+      });
+
+      const untaggedDays = ['2026-09-01', '2026-09-09', '2027-06-18'];
+      untaggedDays.forEach(dStr => {
+        const existingIdx = list.findIndex(e => e && e.date === dStr);
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], tag: 'ninguna' };
+          if (dStr === '2026-09-09' || dStr === '2027-06-18') {
+            delete list[existingIdx].time;
+          }
+        }
+      });
+
+      const cleanedDays = ['2027-01-08', '2027-03-22'];
+      cleanedDays.forEach(dStr => {
+        const idx = list.findIndex(e => e && e.date === dStr);
+        if (idx >= 0) {
+          list.splice(idx, 1);
+        }
+      });
+
+      const magdalenaDays = [
+        { id: 'mag_1', date: '2027-03-01', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_2', date: '2027-03-02', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_3', date: '2027-03-03', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_4', date: '2027-03-04', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_5', date: '2027-03-05', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' }
+      ];
+
+      magdalenaDays.forEach(req => {
+        const existingIdx = list.findIndex(e => e && e.date === req.date);
+        if (existingIdx >= 0) {
+          list[existingIdx] = { ...list[existingIdx], type: 'nota', tag: 'ninguna', title: 'FIESTAS DE LA MAGDALENA' };
+          delete list[existingIdx].time;
+        } else {
+          list.push(req);
+        }
+      });
+
+      return list;
+    }
+
     function formatDateDDMMYYYY(dateVal) {
       if (!dateVal) return '';
       if (dateVal instanceof Date) {
@@ -1085,6 +1198,13 @@
             updatedRow[dk] = updatedRow[dk].replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal');
           }
         });
+        if (updatedRow.time === '10:45 – 11:10') {
+          if (updatedRow.wednesday === 'Patio / Biblioteca') updatedRow.wednesday = 'Guardia de Biblioteca';
+          if (updatedRow.thursday === 'Recreo') updatedRow.thursday = 'Guardia de Biblioteca';
+        }
+        if (updatedRow.time === '13:55 – 14:05') {
+          if (updatedRow.thursday === 'Descanso') updatedRow.thursday = '—';
+        }
         return updatedRow;
       });
     }
@@ -1097,6 +1217,60 @@
         .replace(/4º\s+ESO\s+([A-Z])/gi, '4º\u00A0ESO\u00A0$1')
         .replace(/1º\s+Bachillerato/gi, '1º\u00A0Bachillerato')
         .replace(/2º\s+Bachillerato/gi, '2º\u00A0Bachillerato');
+    }
+
+    function renderTextWithLinks(text, linkStyle = {}) {
+      if (!text || typeof text !== 'string') return text || null;
+
+      const linkRegex = /(\[(.*?)\]\((https?:\/\/[^\s\)]+)\))|(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+      let keyIdx = 0;
+
+      while ((match = linkRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(text.substring(lastIndex, match.index));
+        }
+
+        let href = '';
+        let display = '';
+
+        if (match[1]) {
+          display = match[2] || match[3];
+          href = match[3];
+        } else if (match[4]) {
+          display = match[4];
+          href = match[4];
+        } else if (match[5]) {
+          display = match[5];
+          href = 'https://' + match[5];
+        }
+
+        parts.push(h('a', {
+          key: `lnk_${keyIdx++}_${match.index}`,
+          href: href,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          style: {
+            color: '#2563EB',
+            textDecoration: 'underline',
+            fontWeight: 700,
+            wordBreak: 'break-all',
+            cursor: 'pointer',
+            ...linkStyle
+          },
+          onClick: e => e.stopPropagation()
+        }, `🔗 ${display}`));
+
+        lastIndex = linkRegex.lastIndex;
+      }
+
+      if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+      }
+
+      return parts.length > 0 ? parts : text;
     }
 
     // --- INITIAL TEACHER SCHEDULE DATA ---
@@ -1133,8 +1307,8 @@
         type: 'patio',
         monday: 'Recreo',
         tuesday: 'Guardia de Patio',
-        wednesday: 'Patio / Biblioteca',
-        thursday: 'Recreo',
+        wednesday: 'Guardia de Biblioteca',
+        thursday: 'Guardia de Biblioteca',
         friday: 'Recreo'
       },
       {
@@ -1170,7 +1344,7 @@
         monday: 'Descanso',
         tuesday: '—',
         wednesday: '—',
-        thursday: 'Descanso',
+        thursday: '—',
         friday: '—'
       },
       {
@@ -1187,16 +1361,53 @@
     // --- INITIAL DATA ---
     const INITIAL_DATA = {
       calendarEvents: [
-        { id: '1', date: '2026-09-01', title: '', type: 'trimestre', tag: 'no_lectivo', details: 'Reuniones iniciales de claustro y preparación de grupos' },
-        { id: '2', date: '2026-09-09', title: 'Inicio del curso', type: 'trimestre', tag: 'evaluacion', time: '09:00', details: 'Primer día lectivo del curso escolar 2026/2027' },
-        { id: '3', date: '2026-10-12', title: '', type: 'festivo', tag: 'festivo', details: 'Sin actividad lectiva' },
-        { id: '4', date: '2026-11-01', title: '', type: 'festivo', tag: 'festivo', details: 'Sin actividad lectiva' },
-        { id: '5', date: '2026-12-06', title: '', type: 'festivo', tag: 'festivo', details: 'Sin actividad lectiva' },
-        { id: '6', date: '2026-12-22', title: 'Boletines de notas', type: 'trimestre', tag: 'evaluacion', time: '11:30', details: 'Entrega de boletines de evaluación a las familias' },
-        { id: '7', date: '2026-12-23', title: '', type: 'vacaciones', tag: 'no_lectivo', details: 'Periodo de descanso hasta el 7 de enero' },
-        { id: '8', date: '2027-01-08', title: '', type: 'trimestre', tag: 'evaluacion', time: '09:00', details: 'Reanudación de las sesiones de clase' },
-        { id: '9', date: '2027-03-22', title: '', type: 'vacaciones', tag: 'no_lectivo', details: 'Hasta el 29 de marzo' },
-        { id: '10', date: '2027-06-18', title: 'Fin del curso', type: 'trimestre', tag: 'evaluacion', time: '12:00', details: 'Último día lectivo oficial del curso 2026/2027' }
+        { id: '1', date: '2026-09-01', title: '', type: 'trimestre', tag: 'ninguna', details: 'Reuniones iniciales de claustro y preparación de grupos' },
+        { id: '2', date: '2026-09-09', title: 'Inicio del curso', type: 'trimestre', tag: 'ninguna', details: 'Primer día lectivo del curso escolar 2026/2027' },
+        { id: 'nl_oct_5', date: '2026-10-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_6', date: '2026-10-06', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_7', date: '2026-10-07', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_oct_8', date: '2026-10-08', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_oct_9', date: '2026-10-09', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: '3', date: '2026-10-12', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: '4', date: '2026-11-01', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: '5', date: '2026-12-06', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_dic_8', date: '2026-12-08', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'nl_dic_22', date: '2026-12-22', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_23', date: '2026-12-23', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_24', date: '2026-12-24', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_dic_25', date: '2026-12-25', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'nl_dic_28', date: '2026-12-28', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_29', date: '2026-12-29', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_30', date: '2026-12-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_dic_31', date: '2026-12-31', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_ene_1', date: '2027-01-01', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'nl_ene_4', date: '2027-01-04', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_ene_5', date: '2027-01-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_ene_6', date: '2027-01-06', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'mag_1', date: '2027-03-01', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_2', date: '2027-03-02', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_3', date: '2027-03-03', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_4', date: '2027-03-04', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'mag_5', date: '2027-03-05', title: 'FIESTAS DE LA MAGDALENA', type: 'nota', tag: 'ninguna', details: '' },
+        { id: 'f_mar_19', date: '2027-03-19', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'nl_mar_25', date: '2027-03-25', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_mar_26', date: '2027-03-26', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'f_mar_29', date: '2027-03-29', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: 'nl_mar_30', date: '2027-03-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_mar_31', date: '2027-03-31', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_1', date: '2027-04-01', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_2', date: '2027-04-02', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_abr_5', date: '2027-04-05', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'f_may_1', date: '2027-05-01', title: '', type: 'festivo', tag: 'festivo', details: '' },
+        { id: '10', date: '2027-06-18', title: 'Fin del curso', type: 'trimestre', tag: 'ninguna', details: 'Último día lectivo oficial del curso 2026/2027' },
+        { id: 'nl_jun_21', date: '2027-06-21', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_22', date: '2027-06-22', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_23', date: '2027-06-23', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_24', date: '2027-06-24', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_25', date: '2027-06-25', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_28', date: '2027-06-28', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_29', date: '2027-06-29', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' },
+        { id: 'nl_jun_30', date: '2027-06-30', title: '', type: 'vacaciones', tag: 'no_lectivo', details: '' }
       ],
       weeklyPlans: [],
       notes: [
@@ -1226,17 +1437,46 @@
           important: true
         }
       ],
-      deptMeetings: [
-        { 
-          id: 'd1', 
-          date: '2026-09-16', 
-          title: 'Reunión 1: Reparto de niveles y libros de texto', 
-          meetingType: 'Ordinaria',
-          attendees: DEFAULT_DEPT_TEACHERS.join(', '),
-          agenda: '1. Reparto de materias, grupos y niveles lectivos\n2. Criterios de elección de libros de texto y lecturas obligatorias\n3. Elaboración de la programación didáctica', 
-          agreements: 'Seleccionada la lista de lecturas obligatorias por consenso y distribuido el horario de atención al departamento.',
-          notes: 'Ruegos y preguntas: Se solicita fijar la hora de departamento los miércoles a 6ª hora.',
-          important: true
+      temporalizations: [
+        {
+          id: 'temp_1',
+          title: 'Temporalización 4º ESO - Lengua Castellana y Literatura',
+          url: 'https://ejemplo.edu/temporalizacion-4eso-lengua',
+          category: '4º ESO',
+          description: 'Secuenciación trimestral de saberes básicos, criterios de evaluación y unidades didácticas para 4º ESO.',
+          pinned: true,
+          lastUsedAt: 1756700000000,
+          createdAt: '2026-09-01'
+        },
+        {
+          id: 'temp_2',
+          title: 'Temporalización 1º Bachillerato - Lengua Castellana y Literatura I',
+          url: 'https://ejemplo.edu/temporalizacion-1bach-lengua',
+          category: '1º Bachillerato',
+          description: 'Planificación temporal de comentarios de texto, tipología textual e historia de la literatura.',
+          pinned: true,
+          lastUsedAt: 1756600000000,
+          createdAt: '2026-09-01'
+        },
+        {
+          id: 'temp_3',
+          title: 'Temporalización Literatura Universal - 1º Bachillerato',
+          url: 'https://ejemplo.edu/temporalizacion-lit-universal',
+          category: 'Literatura Universal',
+          description: 'Distribución de grandes obras de la literatura universal por bloques temáticos y periodos históricos.',
+          pinned: false,
+          lastUsedAt: 1756500000000,
+          createdAt: '2026-09-01'
+        },
+        {
+          id: 'temp_4',
+          title: 'Recopilación de Páginas Web y Recursos Didácticos Generales',
+          url: 'https://ejemplo.edu/recursos-docentes-varios',
+          category: 'Otros',
+          description: 'Directorio de portales educativos, enlaces de referencia y herramientas digitales para el aula.',
+          pinned: false,
+          lastUsedAt: 1756400000000,
+          createdAt: '2026-09-01'
         }
       ],
       groups: INITIAL_GROUPS
@@ -1498,13 +1738,13 @@
             const parsed = JSON.parse(saved);
             if (parsed && typeof parsed === 'object') {
               return {
-                calendarEvents: Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : INITIAL_DATA.calendarEvents,
+                calendarEvents: sanitizeCalendarEvents(Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : INITIAL_DATA.calendarEvents),
                 weeklyPlans: Array.isArray(parsed.weeklyPlans) ? parsed.weeklyPlans.filter(w => w && w.id !== 'w1') : [],
                 notes: Array.isArray(parsed.notes) ? parsed.notes : INITIAL_DATA.notes,
                 teacherSchedule: (Array.isArray(parsed.teacherSchedule) && parsed.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(parsed.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
                 ccpMeetings: Array.isArray(parsed.ccpMeetings) ? parsed.ccpMeetings : INITIAL_DATA.ccpMeetings,
                 claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
-                deptMeetings: Array.isArray(parsed.deptMeetings) ? parsed.deptMeetings : INITIAL_DATA.deptMeetings,
+                temporalizations: Array.isArray(parsed.temporalizations) ? parsed.temporalizations : INITIAL_DATA.temporalizations,
                 groups: (Array.isArray(parsed.groups) && parsed.groups.length > 0) ? sanitizeGroups(parsed.groups) : INITIAL_GROUPS
               };
             }
@@ -1585,8 +1825,8 @@
             return h(CCPView, { meetings: data.ccpMeetings || [], setMeetings: m => setData({...data, ccpMeetings: m}) });
           case 'claustro':
             return h(ClaustroView, { meetings: data.claustroMeetings || [], setMeetings: m => setData({...data, claustroMeetings: m}) });
-          case 'dept':
-            return h(DeptView, { meetings: data.deptMeetings || [], setMeetings: m => setData({...data, deptMeetings: m}) });
+          case 'temporalizaciones':
+            return h(TemporalizationsView, { items: data.temporalizations || [], setItems: items => setData({...data, temporalizations: items}) });
           default:
             return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
         }
@@ -1601,7 +1841,7 @@
         { id: 'notes', label: 'Notas Docentes', icon: '📝', badge: (data.notes || []).length },
         { id: 'ccp', label: 'Reuniones CCP', icon: '👥', badge: (data.ccpMeetings || []).length },
         { id: 'claustro', label: 'Reuniones CLAUSTRO', icon: '🎓', badge: (data.claustroMeetings || []).length },
-        { id: 'dept', label: 'Reuniones Departamento', icon: '📚', badge: (data.deptMeetings || []).length }
+        { id: 'temporalizaciones', label: 'Temporalizaciones', icon: '⏱️', badge: (data.temporalizations || []).length }
       ];
 
       return h('div', { className: 'app-container' },
@@ -1815,7 +2055,7 @@
                 const pastSlots = todayCombined.filter(x => x.status === 'past');
                 const sortedCombined = [...activeOrFuture, ...pastSlots];
 
-                return sortedCombined.length > 0 ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '240px', overflowY: 'auto' } },
+                return sortedCombined.length > 0 ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto' } },
                   sortedCombined.map(({ slot, item, official, status }) => {
                     const blocks = item.blocks || [];
                     const badgeStyle = getSlotBadgeStyle(official);
@@ -1827,12 +2067,15 @@
                       key: slot.time,
                       style: {
                         background: isCurrent ? '#EFF6FF' : (isPast ? '#F8FAFC' : 'var(--bg-card-subtle)'),
-                        padding: '0.55rem 0.75rem',
+                        padding: '0.6rem 0.75rem',
                         borderRadius: 'var(--radius-md)',
                         border: isCurrent ? '2px solid #3B82F6' : (isPast ? '1px dashed #CBD5E1' : '1px solid var(--border-subtle)'),
                         fontSize: '0.8rem',
                         opacity: isPast ? 0.65 : 1,
-                        boxShadow: isCurrent ? '0 2px 8px rgba(59, 130, 246, 0.15)' : 'none'
+                        boxShadow: isCurrent ? '0 2px 8px rgba(59, 130, 246, 0.15)' : 'none',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'anywhere',
+                        whiteSpace: 'pre-wrap'
                       }
                     },
                       h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.2rem' } },
@@ -1845,12 +2088,24 @@
                       ),
 
                       /* RENDER PROGRAMMED WORK BLOCKS */
-                      blocks.length > 0 ? h('div', { style: { marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+                      blocks.length > 0 ? h('div', { style: { marginTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
                         blocks.map((blk, bIdx) => {
                           const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
-                          return h('div', { key: bIdx, style: { display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.775rem' } },
-                            lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem' } }, lessonObj.label),
-                            h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600 } }, blk.text)
+                          return h('div', {
+                            key: bIdx,
+                            style: {
+                              display: 'flex',
+                              gap: '0.35rem',
+                              alignItems: 'flex-start',
+                              fontSize: '0.8rem',
+                              lineHeight: 1.35,
+                              wordBreak: 'break-word',
+                              overflowWrap: 'anywhere',
+                              whiteSpace: 'pre-wrap'
+                            }
+                          },
+                            lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                            h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
                           );
                         })
                       ) : (official ? h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.15rem' } }, 'Sin bloques específicos de aula') : null)
@@ -2258,7 +2513,7 @@
           date: dateStr,
           title: title.trim(),
           tag: tag || 'ninguna',
-          time: (tag === 'evaluacion' || tag === 'ccp' || tag === 'claustro') ? (time || '') : '',
+          time: (tag === 'evaluacion' || tag === 'ccp' || tag === 'claustro' || tag === 'otras_reuniones') ? (time || '') : '',
           type: tag || 'nota',
           details: details || ''
         };
@@ -2280,7 +2535,8 @@
             h('span', { className: 'badge', style: { background: 'var(--tag-festivo-bg)', color: 'var(--tag-festivo-text)' } }, 'Festivo'),
             h('span', { className: 'badge', style: { background: 'var(--tag-evaluacion-bg)', color: 'var(--tag-evaluacion-text)' } }, 'Evaluación'),
             h('span', { className: 'badge', style: { background: 'var(--tag-ccp-bg)', color: 'var(--tag-ccp-text)' } }, 'CCP'),
-            h('span', { className: 'badge', style: { background: 'var(--tag-claustro-bg)', color: 'var(--tag-claustro-text)' } }, 'Claustro')
+            h('span', { className: 'badge', style: { background: 'var(--tag-claustro-bg)', color: 'var(--tag-claustro-text)' } }, 'Claustro'),
+            h('span', { className: 'badge', style: { background: 'var(--tag-otras-reuniones-bg)', color: 'var(--tag-otras-reuniones-text)' } }, 'Otras reuniones')
           )
         ),
         h('div', { className: 'all-months-container' },
@@ -2356,7 +2612,7 @@
       const dObj = new Date(dateStr);
       const dayNameCapitalized = dObj.toLocaleDateString('es-ES', { weekday: 'long' });
       const formattedDate = `${dayNameCapitalized}, ${formatDateDDMMYYYY(dateStr)}`;
-      const showTimeInput = (tag === 'evaluacion' || tag === 'ccp' || tag === 'claustro');
+      const showTimeInput = (tag === 'evaluacion' || tag === 'ccp' || tag === 'claustro' || tag === 'otras_reuniones');
 
       return h('div', { className: 'modal-overlay' },
         h('div', { className: 'modal-content', style: { maxWidth: '600px' }, onClick: e => e.stopPropagation() },
@@ -2412,11 +2668,12 @@
                   h('option', { value: 'festivo' }, 'Festivo'),
                   h('option', { value: 'evaluacion' }, 'Evaluación'),
                   h('option', { value: 'ccp' }, 'CCP'),
-                  h('option', { value: 'claustro' }, 'Claustro')
+                  h('option', { value: 'claustro' }, 'Claustro'),
+                  h('option', { value: 'otras_reuniones' }, 'Otras reuniones')
                 )
               ),
               showTimeInput && h('div', { className: 'form-group', style: { background: 'var(--bg-card-subtle)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-                h('label', { className: 'form-label' }, `🕒 Hora de la Sesión (${tag.toUpperCase()})`),
+                h('label', { className: 'form-label' }, `🕒 Hora de la Sesión (${tag === 'otras_reuniones' ? 'OTRAS REUNIONES' : tag.toUpperCase()})`),
                 h('input', { type: 'time', className: 'form-control', value: time, onChange: e => setTime(e.target.value) })
               ),
               h('div', { className: 'form-group' },
@@ -2441,6 +2698,173 @@
       );
     }
 
+    // --- EXPANDED DAY FOCUS MODAL FOR EASY READING ---
+    function ExpandedDayModal({ dayKey, dayName, dayDateFormatted, dayDateISO, dayInfo = {}, calendarEvents = [], teacherSchedule = [], isProgrammableDay, isNonSchoolDay, onSlotClick, onClose }) {
+      const timeSlotsList = getTimeSlotsForDay(dayKey);
+      const daySlotsData = dayInfo.slots || {};
+
+      const now = new Date();
+      const todayYYYY = now.getFullYear();
+      const todayMM = String(now.getMonth() + 1).padStart(2, '0');
+      const todayDD = String(now.getDate()).padStart(2, '0');
+      const todayISO = `${todayYYYY}-${todayMM}-${todayDD}`;
+      const isToday = (dayDateISO === todayISO);
+
+      const nowTotalMins = now.getHours() * 60 + now.getMinutes();
+
+      // Decorate slots with real-time status if viewing TODAY
+      const decoratedSlots = timeSlotsList.map(slot => {
+        let startMins = -1;
+        let endMins = -1;
+        const parts = slot.time.split(/[\s–-]+/);
+        if (parts.length >= 2) {
+          const [h1, m1] = parts[0].split(':').map(Number);
+          const [h2, m2] = parts[1].split(':').map(Number);
+          if (!isNaN(h1) && !isNaN(m1)) startMins = h1 * 60 + m1;
+          if (!isNaN(h2) && !isNaN(m2)) endMins = h2 * 60 + m2;
+        }
+
+        let status = 'upcoming';
+        if (isToday && startMins >= 0 && endMins >= 0) {
+          if (nowTotalMins >= startMins && nowTotalMins <= endMins) {
+            status = 'current';
+          } else if (nowTotalMins > endMins) {
+            status = 'past';
+          } else {
+            status = 'future';
+          }
+        }
+        return { slot, status };
+      });
+
+      const hasCurrent = decoratedSlots.some(x => x.status === 'current');
+
+      // If viewing TODAY and a session is currently in progress, place current session FIRST and past sessions at the BOTTOM.
+      // Otherwise (before start of day, after end of day, or another date), display natural chronological order!
+      let orderedSlots = decoratedSlots;
+      if (isToday && hasCurrent) {
+        const currentSlots = decoratedSlots.filter(x => x.status === 'current');
+        const futureSlots = decoratedSlots.filter(x => x.status === 'future');
+        const pastSlots = decoratedSlots.filter(x => x.status === 'past');
+        orderedSlots = [...currentSlots, ...futureSlots, ...pastSlots];
+      }
+
+      return h('div', { className: 'modal-overlay', onClick: onClose },
+        h('div', {
+          className: 'modal-content',
+          style: { maxWidth: '780px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
+          onClick: e => e.stopPropagation()
+        },
+          h('div', { className: 'modal-header', style: { borderBottom: '2px solid var(--gold-accent)', paddingBottom: '0.75rem' } },
+            h('div', null,
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem' } },
+                h('h3', { style: { fontSize: '1.4rem', color: 'var(--ink-blue)', margin: 0 } }, `🔍 ${dayName}`),
+                h('span', { className: 'badge badge-gold', style: { fontSize: '0.9rem', padding: '0.2rem 0.6rem' } }, dayDateFormatted)
+              ),
+              h('p', { style: { fontSize: '0.825rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' } }, 'Vista ampliada de lectura fácil para la programación del día')
+            ),
+            h('button', { className: 'btn btn-secondary', onClick: onClose, style: { fontSize: '0.9rem', padding: '0.35rem 0.75rem' } }, '✕ Cerrar Vista Ampliada')
+          ),
+
+          h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '0.85rem', overflowY: 'auto', padding: '1rem 0.35rem' } },
+            orderedSlots.map(({ slot, status }) => {
+              const slotData = daySlotsData[slot.time];
+              const blocks = slotData?.blocks || [];
+              const officialActivity = getScheduleActivity(teacherSchedule, dayKey, slot.time);
+              const displayActivity = formatPlannerText(officialActivity);
+              const badgeStyle = getSlotBadgeStyle(officialActivity);
+              const hasCustomData = Boolean(slotData && (slotData.subject || blocks.some(b => b.text || b.type)));
+
+              const isCurrent = status === 'current';
+              const isPast = status === 'past';
+
+              if (slot.type === 'patio') {
+                return h('div', {
+                  key: slot.time,
+                  style: {
+                    background: '#FEF3C7',
+                    border: '1px dashed #F59E0B',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '0.65rem 1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }
+                },
+                  h('span', { style: { fontWeight: 700, color: '#92400E', fontSize: '0.9rem' } }, `☕ ${slot.label} (${slot.time})`),
+                  displayActivity && h('span', { style: { padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, ...badgeStyle } }, displayActivity)
+                );
+              }
+
+              return h('div', {
+                key: slot.time,
+                onClick: () => {
+                  if (isProgrammableDay) {
+                    onSlotClick(slot);
+                  }
+                },
+                style: {
+                  background: isCurrent ? '#EFF6FF' : (hasCustomData ? '#FFFFFF' : 'var(--bg-card-subtle)'),
+                  border: isCurrent ? '2px solid #3B82F6' : (hasCustomData ? '2px solid var(--ink-blue)' : '1px solid var(--border-color)'),
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem 1.15rem',
+                  cursor: isProgrammableDay ? 'pointer' : 'default',
+                  transition: 'all 0.15s ease',
+                  opacity: isPast ? 0.75 : 1,
+                  boxShadow: isCurrent ? '0 4px 14px rgba(59, 130, 246, 0.2)' : (hasCustomData ? '0 3px 10px rgba(0,0,0,0.06)' : 'none')
+                }
+              },
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.4rem' } },
+                    h('span', { style: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--ink-blue)' } }, `⏰ ${slot.label} (${slot.time})`),
+                    isCurrent && h('span', { className: 'badge', style: { background: '#EF4444', color: '#FFFFFF', fontSize: '0.7rem', padding: '0.15rem 0.45rem', fontWeight: 700 } }, '🔴 EN CURSO'),
+                    isPast && h('span', { className: 'badge', style: { background: '#E2E8F0', color: '#64748B', fontSize: '0.7rem', padding: '0.15rem 0.45rem', fontWeight: 600 } }, '✓ Finalizada')
+                  ),
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem' } },
+                    displayActivity ? h('span', { style: { padding: '0.25rem 0.65rem', borderRadius: '6px', fontSize: '0.825rem', fontWeight: 700, ...badgeStyle } }, displayActivity) : (slotData?.subject ? h('span', { style: { color: 'var(--gold-accent)', fontWeight: 700, fontSize: '0.85rem' } }, `${slotData.subject} (${slotData.group || ''})`) : null),
+                    isProgrammableDay && h('button', {
+                      type: 'button',
+                      className: 'btn btn-gold',
+                      style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: 700 },
+                      onClick: (e) => {
+                        e.stopPropagation();
+                        onSlotClick(slot);
+                      }
+                    }, '✍️ Editar')
+                  )
+                ),
+
+                blocks.length > 0 ? h('div', { style: { marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' } },
+                  blocks.map((blk, bIdx) => {
+                    const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
+                    return h('div', {
+                      key: bIdx,
+                      style: {
+                        background: 'var(--bg-parchment)',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--border-subtle)',
+                        fontSize: '0.9rem',
+                        lineHeight: 1.45,
+                        display: 'flex',
+                        gap: '0.5rem',
+                        alignItems: 'flex-start',
+                        wordBreak: 'break-word',
+                        whiteSpace: 'pre-wrap'
+                      }
+                    },
+                      lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.725rem', padding: '0.15rem 0.5rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                      blk.text && h('span', { style: { color: 'var(--text-primary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
+                    );
+                  })
+                ) : (isProgrammableDay ? h('div', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.25rem 0' } }, '✍️ Sin programación en esta hora. Haz clic para programar.') : null)
+              );
+            })
+          )
+        )
+      );
+    }
+
     // --- WEEKLY PLANNER ---
     function WeeklyPlanner({ plans, setPlans, calendarEvents = [], teacherSchedule = INITIAL_TEACHER_SCHEDULE, targetDate = null }) {
       const today = new Date();
@@ -2451,6 +2875,7 @@
         return plans[0]?.startDate || defaultMonday;
       });
       const [selectedSlotTarget, setSelectedSlotTarget] = useState(null);
+      const [expandedDayKey, setExpandedDayKey] = useState(null);
 
       useEffect(() => {
         if (targetDate) {
@@ -2575,14 +3000,32 @@
             },
               h('div', null,
                 h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.35rem', borderBottom: '1px solid var(--border-subtle)' } },
-                  h('div', null,
+                  h('div', {
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      setExpandedDayKey(d.key);
+                    },
+                    style: { cursor: 'pointer', display: 'flex', flexDirection: 'column' },
+                    title: `Haz clic para ampliar la vista de lectura del ${d.label}`
+                  },
                     h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                      h('h4', { style: { fontSize: '1.05rem', color: isWithinSchoolYear ? 'var(--ink-blue)' : 'var(--text-muted)', lineHeight: 1.1 } }, d.label),
+                      h('h4', { style: { fontSize: '1.05rem', color: isWithinSchoolYear ? 'var(--ink-blue)' : 'var(--text-muted)', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '0.3rem' } },
+                        d.label,
+                        h('span', { style: { fontSize: '0.75rem', color: 'var(--gold-accent)' } }, '🔍')
+                      ),
                       tagBadge
                     ),
                     h('span', { style: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold-accent)' } }, dayDateFormatted)
                   ),
-                  isProgrammableDay ? h('span', { className: 'badge badge-gold', style: { fontSize: '0.625rem', padding: '0.15rem 0.35rem' } }, 'Programar ✍️') : (isNonSchoolDay ? h('span', { className: 'badge', style: { background: '#FEE2E2', color: '#991B1B', fontSize: '0.625rem', padding: '0.15rem 0.35rem', fontWeight: 700 } }, '🚫 No Lectivo') : h('span', { style: { fontSize: '0.625rem', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Sin lectiva'))
+                  isProgrammableDay ? h('button', {
+                    type: 'button',
+                    onClick: (e) => {
+                      e.stopPropagation();
+                      setExpandedDayKey(d.key);
+                    },
+                    className: 'btn btn-gold',
+                    style: { fontSize: '0.65rem', padding: '0.15rem 0.45rem', fontWeight: 700 }
+                  }, '🔍 Ampliar') : (isNonSchoolDay ? h('span', { className: 'badge', style: { background: '#FEE2E2', color: '#991B1B', fontSize: '0.625rem', padding: '0.15rem 0.35rem', fontWeight: 700 } }, '🚫 No Lectivo') : h('span', { style: { fontSize: '0.625rem', color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Sin lectiva'))
                 ),
 
                 /* IF OUTSIDE SCHOOL YEAR: LEAVE COMPLETELY BLANK */
@@ -2683,14 +3126,26 @@
                             ...badgeStyle
                           }
                         }, displayActivity),
-                        slotData && (slotData.subject || blocks.length > 0) ? h('div', { style: { marginTop: '0.25rem' } },
-                          slotData.subject && h('div', { style: { fontSize: '0.725rem', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.2rem' } }, `${formatPlannerText(slotData.subject)} (${slotData.group || ''})`),
-                          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' } },
+                        slotData && (slotData.subject || blocks.length > 0) ? h('div', { style: { marginTop: '0.25rem', wordBreak: 'break-word', overflowWrap: 'anywhere' } },
+                          slotData.subject && h('div', { style: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.2rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' } }, `${formatPlannerText(slotData.subject)} (${slotData.group || ''})`),
+                          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
                             blocks.map((blk, bIdx) => {
                               const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
-                              return h('div', { key: bIdx, style: { fontSize: '0.725rem', lineHeight: 1.25, display: 'flex', gap: '0.3rem', alignItems: 'flex-start', flexWrap: 'wrap' } },
-                                lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.625rem', padding: '0.1rem 0.35rem' } }, lessonObj.label),
-                                blk.text && h('span', { style: { color: 'var(--text-secondary)', fontWeight: 500 } }, blk.text)
+                              return h('div', {
+                                key: bIdx,
+                                style: {
+                                  fontSize: '0.75rem',
+                                  lineHeight: 1.35,
+                                  display: 'flex',
+                                  gap: '0.35rem',
+                                  alignItems: 'flex-start',
+                                  wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere',
+                                  whiteSpace: 'pre-wrap'
+                                }
+                              },
+                                lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.625rem', padding: '0.1rem 0.35rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                                blk.text && h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
                               );
                             })
                           )
@@ -2704,6 +3159,42 @@
             );
           })
         ),
+        expandedDayKey && (() => {
+          const expDay = days.find(d => d.key === expandedDayKey);
+          if (!expDay) return null;
+          const dayDateFormatted = getFormattedDayDate(currentMondayStr, expDay.offset);
+          const dayDateISO = shiftDateByDays(currentMondayStr, expDay.offset);
+          const dayEvt = (calendarEvents || []).find(e => e.date === dayDateISO);
+          const isWithinSchoolYear = (dayDateISO >= '2026-09-09' && dayDateISO <= '2027-06-18');
+          const tag = dayEvt?.tag;
+          const isNonSchoolDay = (tag === 'festivo' || tag === 'no_lectivo');
+          const isProgrammableDay = isWithinSchoolYear && !isNonSchoolDay;
+          const dayInfo = activeWeek.days?.[expDay.key] || {};
+
+          return h(ExpandedDayModal, {
+            dayKey: expDay.key,
+            dayName: expDay.label,
+            dayDateFormatted: dayDateFormatted,
+            dayDateISO: dayDateISO,
+            dayInfo: dayInfo,
+            calendarEvents: calendarEvents,
+            teacherSchedule: teacherSchedule,
+            isProgrammableDay: isProgrammableDay,
+            isNonSchoolDay: isNonSchoolDay,
+            onSlotClick: (slot) => {
+              setSelectedSlotTarget({
+                dayKey: expDay.key,
+                dayName: expDay.label,
+                dayDateFormatted: dayDateFormatted,
+                slotTime: slot.time,
+                slotLabel: slot.label,
+                slotData: (dayInfo.slots || {})[slot.time] || {},
+                officialActivity: getScheduleActivity(teacherSchedule, expDay.key, slot.time)
+              });
+            },
+            onClose: () => setExpandedDayKey(null)
+          });
+        })(),
         selectedSlotTarget && h(SingleSlotProgrammerModal, {
           dayKey: selectedSlotTarget.dayKey,
           dayName: selectedSlotTarget.dayName,
@@ -2762,6 +3253,66 @@
         setBlocks(blocks.filter((_, idx) => idx !== bIdx));
       };
 
+      const handleInsertLinkToBlock = (bIdx) => {
+        let currentBlocks = [...blocks];
+        if (currentBlocks.length === 0) {
+          currentBlocks = [{ type: 'explicacion', text: '' }];
+        }
+        const targetIdx = (bIdx !== undefined && bIdx !== null && bIdx >= 0) ? bIdx : (currentBlocks.length - 1);
+        const blk = currentBlocks[targetIdx] || { type: 'explicacion', text: '' };
+        const currentText = (blk.text || '').trim();
+
+        const urlInput = window.prompt(
+          '🔗 Insertar Enlace Web\n\n1. Pega la dirección URL (Drive, YouTube, Canva, web...):',
+          'https://'
+        );
+
+        if (!urlInput || urlInput.trim() === '' || urlInput.trim() === 'https://') return;
+
+        const cleanUrl = urlInput.trim();
+
+        const defaultLabel = currentText ? currentText : 'Ver documento / enlace';
+        const labelInput = window.prompt(
+          '📝 Texto visible que tendrá el enlace:\n(Ej: Ficha de lectura, Vídeo explicativo, Canva...)',
+          defaultLabel
+        );
+
+        const displayLabel = (labelInput && labelInput.trim()) ? labelInput.trim() : 'Enlace Web';
+        const markdownLink = `[${displayLabel}](${cleanUrl})`;
+
+        let newText = '';
+        if (!currentText) {
+          newText = markdownLink;
+        } else if (currentText === displayLabel) {
+          newText = markdownLink;
+        } else if (currentText.includes(displayLabel)) {
+          newText = currentText.replace(displayLabel, markdownLink);
+        } else {
+          newText = `${currentText} ${markdownLink}`;
+        }
+
+        currentBlocks[targetIdx] = { ...currentBlocks[targetIdx], text: newText };
+        setBlocks(currentBlocks);
+      };
+
+      const handleRemoveLinkFromBlock = (bIdx) => {
+        let currentBlocks = [...blocks];
+        const targetIdx = (bIdx !== undefined && bIdx !== null && bIdx >= 0) ? bIdx : (currentBlocks.findIndex(b => /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(b.text || '')));
+        if (targetIdx < 0 || !currentBlocks[targetIdx]) return;
+
+        const blk = currentBlocks[targetIdx];
+        const currentText = blk.text || '';
+
+        // Clean markdown link [Label](URL) -> Label
+        let cleaned = currentText.replace(/\[(.*?)\]\((https?:\/\/[^\s\)]+)\)/gi, '$1');
+
+        // Clean direct URLs
+        cleaned = cleaned.replace(/(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi, '').trim();
+
+        currentBlocks[targetIdx] = { ...currentBlocks[targetIdx], text: cleaned };
+        setBlocks(currentBlocks);
+      };
+
       const handleClearSlot = () => {
         if (!window.confirm('¿Estás seguro/a de que deseas borrar la programación de esta franja?')) return;
         onSave(dayKey, timeStr, null);
@@ -2774,8 +3325,9 @@
 
       const officialDisplay = formatPlannerText(officialActivity);
       const officialBadgeStyle = getSlotBadgeStyle(officialActivity);
+      const hasLinkInAnyBlock = blocks.some(b => b.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(b.text));
 
-      return h('div', { className: 'modal-overlay' },
+      return h('div', { className: 'modal-overlay', style: { zIndex: 1200 } },
         h('div', { className: 'modal-content', style: { maxWidth: '580px' }, onClick: e => e.stopPropagation() },
           h('div', { className: 'modal-header' },
             h('div', null,
@@ -2816,7 +3368,7 @@
               }, copySuccessMsg),
 
               h('div', { style: { marginTop: '0.35rem' } },
-                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.35rem' } },
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.35rem' } },
                   h('label', { className: 'form-label', style: { marginBottom: 0 } }, 'Bloques de Trabajo de la Sesión'),
                   h('div', { style: { display: 'flex', gap: '0.35rem' } },
                     copiedBlock && h('button', {
@@ -2828,12 +3380,27 @@
                     }, '📋 Pegar Bloque Copiado'),
                     h('button', {
                       type: 'button',
+                      className: 'btn btn-secondary',
+                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#2563EB', borderColor: '#93C5FD', background: '#EFF6FF', fontWeight: 600 },
+                      onClick: () => handleInsertLinkToBlock(blocks.length > 0 ? blocks.length - 1 : 0),
+                      title: 'Insertar un enlace web o hipervínculo en el bloque'
+                    }, '🔗 Enlazar Texto'),
+                    hasLinkInAnyBlock && h('button', {
+                      type: 'button',
+                      className: 'btn btn-secondary',
+                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2', fontWeight: 600 },
+                      onClick: () => handleRemoveLinkFromBlock(),
+                      title: 'Quitar el hipervínculo o URL manteniendo el texto'
+                    }, '🔗❌ Quitar Enlace'),
+                    h('button', {
+                      type: 'button',
                       className: 'btn btn-gold',
                       style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem' },
                       onClick: handleAddBlock
                     }, '➕ Añadir Bloque')
                   )
                 ),
+                h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '0.45rem' } }, '🔗 Usa "🔗 Enlazar Texto" para crear hipervínculos y "🔗❌" para eliminar el enlace conservando el texto.'),
                 blocks.length === 0 ? h('div', { style: { padding: '0.85rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque"' + (copiedBlock ? ' o en "📋 Pegar Bloque Copiado".' : '.')) :
                 h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem' } },
                   blocks.map((blk, bIdx) => h('div', { key: bIdx, style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
@@ -2845,13 +3412,25 @@
                     },
                       LESSON_TYPES.map(l => h('option', { key: l.key, value: l.key }, l.label))
                     ),
-                    h('input', {
+                    h('textarea', {
                       className: 'form-control',
-                      style: { flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' },
+                      style: { flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.825rem', fontFamily: 'inherit', resize: 'vertical', minHeight: '42px', rows: 2, lineHeight: 1.35 },
                       placeholder: 'Contenido del bloque (ej. Ejercicios 1 al 5 pág 23)...',
                       value: blk.text || '',
                       onChange: e => handleBlockChange(bIdx, 'text', e.target.value)
                     }),
+                    h('button', {
+                      type: 'button',
+                      onClick: () => handleInsertLinkToBlock(bIdx),
+                      style: { border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                      title: '🔗 Enlazar este texto con una dirección web'
+                    }, '🔗'),
+                    (blk.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(blk.text)) && h('button', {
+                      type: 'button',
+                      onClick: () => handleRemoveLinkFromBlock(bIdx),
+                      style: { border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.2rem' },
+                      title: '🔗❌ Quitar hipervínculo manteniendo el texto'
+                    }, '🔗❌'),
                     h('button', {
                       type: 'button',
                       onClick: () => handleCopyBlock(blk),
@@ -5129,242 +5708,306 @@
       );
     }
 
-    // --- REUNIONES DEPARTAMENTO WITH WORD EXPORT (.DOC) AND 7 PRE-FILLED TEACHERS ---
-    function DeptView({ meetings, setMeetings }) {
-      const [showAdd, setShowAdd] = useState(false);
-      const [sortBy, setSortBy] = useState('manual');
-      const [editingMeeting, setEditingMeeting] = useState(null);
+    // --- TEMPORALIZACIONES (RECOPILATORIO DE PÁGINAS WEB Y ENLACES) ---
+    function TemporalizationsView({ items, setItems }) {
+      const [showModal, setShowModal] = useState(false);
+      const [editingItem, setEditingItem] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('Todas');
+      const [sortBy, setSortBy] = useState('lastUsed'); // 'lastUsed' | 'manual'
 
-      const [formData, setFormData] = useState({
-        title: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '',
-        meetingType: 'Ordinaria',
-        attendees: DEFAULT_DEPT_TEACHERS.join(', '),
-        agenda: '',
-        agreements: '',
-        notes: '',
-        important: false
-      });
+      const categories = ['4º ESO', '1º Bachillerato', 'Literatura Universal', 'Otros'];
 
       const handleOpenAdd = () => {
         setFormData({
-          title: `Reunión de Departamento nº ${meetings.length + 1}`,
-          date: new Date().toISOString().split('T')[0],
-          time: '15:30',
-          meetingType: 'Ordinaria',
-          attendees: DEFAULT_DEPT_TEACHERS.join(', '),
-          agenda: '1. \n2. \n3. ',
-          agreements: '',
-          notes: '',
-          important: false
+          title: '',
+          url: '',
+          category: '4º ESO',
+          description: '',
+          pinned: false
         });
-        setEditingMeeting(null);
-        setShowAdd(true);
+        setEditingItem(null);
+        setShowModal(true);
       };
 
-      const handleOpenEdit = (m) => {
+      const handleOpenEdit = (item) => {
         setFormData({
-          title: m.title || '',
-          date: m.date || new Date().toISOString().split('T')[0],
-          meetingType: m.meetingType || 'Ordinaria',
-          attendees: m.attendees || DEFAULT_DEPT_TEACHERS.join(', '),
-          agenda: m.agenda || '',
-          agreements: m.agreements || '',
-          notes: m.notes || '',
-          important: Boolean(m.important)
+          title: item.title || '',
+          url: item.url || '',
+          category: categories.includes(item.category) ? item.category : 'Otros',
+          description: item.description || '',
+          pinned: Boolean(item.pinned)
         });
-        setEditingMeeting(m);
-        setShowAdd(true);
+        setEditingItem(item);
+        setShowModal(true);
       };
 
-      const handleToggleTeacherAttendee = (teacherName) => {
-        let currentList = formData.attendees ? formData.attendees.split(',').map(s => s.trim()).filter(Boolean) : [];
-        if (currentList.includes(teacherName)) currentList = currentList.filter(t => t !== teacherName);
-        else currentList.push(teacherName);
-        setFormData({ ...formData, attendees: currentList.join(', ') });
-      };
+      const [formData, setFormData] = useState({
+        title: '',
+        url: '',
+        category: '4º ESO',
+        description: '',
+        pinned: false
+      });
 
       const handleSave = (e) => {
         e.preventDefault();
-        if (editingMeeting) setMeetings(meetings.map(m => m.id === editingMeeting.id ? { ...m, ...formData } : m));
-        else setMeetings([{ id: `dept_${Date.now()}`, ...formData }, ...meetings]);
-        setShowAdd(false);
+        let formattedUrl = formData.url.trim();
+        if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
+          formattedUrl = 'https://' + formattedUrl;
+        }
+
+        const now = Date.now();
+        if (editingItem) {
+          setItems(items.map(it => it.id === editingItem.id ? { ...it, ...formData, url: formattedUrl, lastUsedAt: now } : it));
+        } else {
+          const newItem = {
+            id: `temp_${now}`,
+            ...formData,
+            url: formattedUrl,
+            lastUsedAt: now,
+            createdAt: new Date().toISOString().split('T')[0]
+          };
+          setItems([newItem, ...items]);
+        }
+        setShowModal(false);
+      };
+
+      const handleOpenLink = (item) => {
+        const now = Date.now();
+        setItems(items.map(it => it.id === item.id ? { ...it, lastUsedAt: now } : it));
       };
 
       const handleDelete = (id) => {
-        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de Departamento?')) {
-          setMeetings(meetings.filter(m => m.id !== id));
+        if (window.confirm('¿Estás seguro/a de que deseas eliminar este enlace de temporalización?')) {
+          setItems(items.filter(it => it.id !== id));
         }
       };
-      const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
+
+      const handleTogglePin = (id) => {
+        setItems(items.map(it => it.id === id ? { ...it, pinned: !it.pinned } : it));
+      };
 
       const handleMoveUp = (id) => {
-        const idx = meetings.findIndex(m => m.id === id);
+        const idx = items.findIndex(it => it.id === id);
         if (idx <= 0) return;
-        const updated = [...meetings];
+        const updated = [...items];
         const temp = updated[idx];
         updated[idx] = updated[idx - 1];
         updated[idx - 1] = temp;
-        setMeetings(updated);
+        setItems(updated);
       };
 
       const handleMoveDown = (id) => {
-        const idx = meetings.findIndex(m => m.id === id);
-        if (idx < 0 || idx >= meetings.length - 1) return;
-        const updated = [...meetings];
+        const idx = items.findIndex(it => it.id === id);
+        if (idx < 0 || idx >= items.length - 1) return;
+        const updated = [...items];
         const temp = updated[idx];
         updated[idx] = updated[idx + 1];
         updated[idx + 1] = temp;
-        setMeetings(updated);
+        setItems(updated);
       };
 
-      const sortedMeetings = [...meetings].sort((a, b) => {
-        if (sortBy === 'dateDesc') return new Date(b.date || 0) - new Date(a.date || 0);
-        if (sortBy === 'dateAsc') return new Date(a.date || 0) - new Date(b.date || 0);
-        return meetings.findIndex(m => m.id === a.id) - meetings.findIndex(m => m.id === b.id);
-      });
+      const filteredItems = items.filter(it => {
+        const cat = categories.includes(it.category) ? it.category : 'Otros';
+        const matchesCat = selectedCategory === 'Todas' || cat === selectedCategory;
+        const q = searchQuery.toLowerCase();
+        const matchesQuery = !q || 
+          (it.title && it.title.toLowerCase().includes(q)) ||
+          (it.description && it.description.toLowerCase().includes(q)) ||
+          (it.url && it.url.toLowerCase().includes(q));
+        return matchesCat && matchesQuery;
+      }).sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
 
-      const currentAttendeeNames = formData.attendees ? formData.attendees.split(',').map(s => s.trim()) : [];
+        if (sortBy === 'lastUsed') {
+          return (b.lastUsedAt || 0) - (a.lastUsedAt || 0);
+        }
+        return items.findIndex(it => it.id === a.id) - items.findIndex(it => it.id === b.id);
+      });
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.25rem' } },
         h('div', { className: 'section-header' },
-          h('div', null, h('h2', { className: 'section-title' }, 'Reuniones de Departamento')),
-          h('div', { style: { display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' } },
-            h('select', { className: 'form-control', style: { width: '220px', fontWeight: 600, padding: '0.45rem 0.65rem', background: '#FDF9F0', borderColor: 'var(--gold-accent)' }, value: sortBy, onChange: e => setSortBy(e.target.value) },
-              h('option', { value: 'manual' }, '↕️ Ordenación: Manual'),
-              h('option', { value: 'dateDesc' }, '📅 Reunión: Recientes Primero'),
-              h('option', { value: 'dateAsc' }, '📅 Reunión: Antiguas Primero')
-            ),
-            h('button', { className: 'btn btn-gold', onClick: handleOpenAdd, style: { padding: '0.5rem 1.1rem', fontSize: '0.9rem' } }, '+ Departamento')
+          h('div', null,
+            h('h2', { className: 'section-title' }, '⏱️ Temporalizaciones'),
+            h('p', { style: { fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.2rem' } },
+              'Recopilatorio y directorio de enlaces web a programaciones, temporalizaciones y recursos docentes por nivel.'
+            )
+          ),
+          h('button', { className: 'btn btn-gold', onClick: handleOpenAdd, style: { padding: '0.5rem 1.1rem', fontSize: '0.9rem' } }, '+ Añadir Temporalización')
+        ),
+
+        // Search and Filter Bar
+        h('div', { className: 'card', style: { padding: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' } },
+          h('div', { style: { flex: 1, minWidth: '220px' } },
+            h('input', {
+              className: 'form-control',
+              placeholder: '🔍 Buscar enlaces por título, URL o descripción...',
+              value: searchQuery,
+              onChange: e => setSearchQuery(e.target.value)
+            })
+          ),
+          h('div', { style: { minWidth: '180px' } },
+            h('select', {
+              className: 'form-control',
+              style: { fontWeight: 600, background: '#FDF9F0', borderColor: 'var(--gold-accent)' },
+              value: selectedCategory,
+              onChange: e => setSelectedCategory(e.target.value)
+            },
+              h('option', { value: 'Todas' }, '📂 Todas las Categorías'),
+              categories.map(cat => h('option', { key: cat, value: cat }, `🏷️ ${cat}`))
+            )
+          ),
+          h('div', { style: { minWidth: '210px' } },
+            h('select', {
+              className: 'form-control',
+              style: { fontWeight: 600, background: '#FFFDF9', borderColor: 'var(--border-subtle)' },
+              value: sortBy,
+              onChange: e => setSortBy(e.target.value)
+            },
+              h('option', { value: 'lastUsed' }, '🕒 Orden: Último Uso (Auto)'),
+              h('option', { value: 'manual' }, '↕️ Orden: Manual (Mover ▲/▼)')
+            )
           )
         ),
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-          sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--burgundy)', padding: '1.25rem' } },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
-                h('span', { className: 'badge badge-burgundy' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
-                h('span', { className: 'badge', style: { background: m.meetingType === 'Extraordinaria' ? '#FEE2E2' : '#E9EEF4', color: m.meetingType === 'Extraordinaria' ? '#991B1B' : 'var(--ink-blue)', border: m.meetingType === 'Extraordinaria' ? '1px solid #FCA5A5' : '1px solid var(--border-subtle)' } }, `🏷️ Sesión ${m.meetingType || 'Ordinaria'}`),
-                m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
+
+        // Links Grid
+        filteredItems.length === 0 ? h('div', { className: 'card', style: { padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' } },
+          h('p', { style: { fontSize: '1.1rem', fontWeight: 500 } }, 'No se encontraron enlaces de temporalizaciones.'),
+          h('p', { style: { fontSize: '0.875rem', marginTop: '0.4rem' } }, 'Añade un nuevo enlace haciendo clic en "+ Añadir Temporalización".')
+        ) : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.15rem' } },
+          filteredItems.map(item => h('div', {
+            key: item.id,
+            className: `card ${item.pinned ? 'is-important' : ''}`,
+            style: {
+              borderLeft: item.pinned ? '6px solid var(--gold-accent)' : '6px solid var(--ink-blue)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              padding: '1.15rem'
+            }
+          },
+            h('div', null,
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' } },
+                h('span', {
+                  className: 'badge',
+                  style: { background: '#F0F4F8', color: 'var(--ink-blue)', border: '1px solid var(--border-subtle)', fontWeight: 600 }
+                }, `🏷️ ${categories.includes(item.category) ? item.category : 'Otros'}`),
+                h('div', { style: { display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+                  sortBy === 'manual' && h(React.Fragment, null,
+                    h('button', {
+                      type: 'button',
+                      title: 'Mover arriba',
+                      onClick: () => handleMoveUp(item.id),
+                      style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
+                    }, '▲'),
+                    h('button', {
+                      type: 'button',
+                      title: 'Mover abajo',
+                      onClick: () => handleMoveDown(item.id),
+                      style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
+                    }, '▼')
+                  ),
+                  h('button', {
+                    type: 'button',
+                    title: item.pinned ? 'Desfijar' : 'Fijar arriba',
+                    onClick: () => handleTogglePin(item.id),
+                    style: { background: item.pinned ? '#FEF08A' : 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.85rem' }
+                  }, item.pinned ? '📌 Fijado' : '📌'),
+                  h('button', {
+                    type: 'button',
+                    className: 'btn btn-secondary',
+                    onClick: () => handleOpenEdit(item),
+                    style: { padding: '0.2rem 0.45rem', fontSize: '0.75rem' }
+                  }, '✏️'),
+                  h('button', {
+                    type: 'button',
+                    onClick: () => handleDelete(item.id),
+                    style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }
+                  }, '🗑️')
+                )
               ),
-              h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' } },
-                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => exportDeptMeetingToWord(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem', color: '#2563EB', borderColor: '#BFDBFE', background: '#EFF6FF' } }, '📄 Exportar Word'),
-                h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
-                sortBy === 'manual' && h(React.Fragment, null,
-                  h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
-                  h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
-                ),
-                h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
-                h(DownloadMenu, { title: m.title, sections: [
-                  { label: '📋 Orden del Día', content: m.agenda },
-                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
-                  { label: '📝 Notas Adicionales', content: m.notes }
-                ]}),
-                h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
-              )
+              h('h3', { style: { fontSize: '1.1rem', color: 'var(--ink-blue)', marginBottom: '0.35rem', lineHeight: '1.3' } }, item.title),
+              item.description && h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', lineHeight: '1.4' } }, item.description)
             ),
-            h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.4rem' } }, m.title),
-            m.attendees && h('div', { style: { fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '0.75rem', background: '#FDF2F4', padding: '0.4rem 0.75rem', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--burgundy)' } },
-              `👥 Asistentes (${m.attendees.split(',').length}): ${m.attendees}`
-            ),
-            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
-              ),
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
-              )
-            ),
-            m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
+            h('div', { style: { marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-start', alignItems: 'center' } },
+              h('a', {
+                href: item.url,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                onClick: () => handleOpenLink(item),
+                className: 'btn btn-primary',
+                style: { textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', fontSize: '0.825rem', fontWeight: 600 }
+              }, 'Abrir enlace 🔗')
             )
           ))
         ),
-        showAdd && h('div', { className: 'modal-overlay' },
-          h('div', { className: 'modal-content', style: { maxWidth: '840px' }, onClick: e => e.stopPropagation() },
+
+        // Modal Form
+        showModal && h('div', { className: 'modal-overlay' },
+          h('div', { className: 'modal-content', style: { maxWidth: '560px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
-              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento de Departamento' : 'Nuevo Documento (+ Departamento)'),
-              h('button', { onClick: () => setShowAdd(false) }, '✕')
+              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingItem ? 'Editar Enlace de Temporalización' : 'Nuevo Enlace de Temporalización'),
+              h('button', { onClick: () => setShowModal(false) }, '✕')
             ),
             h('form', { onSubmit: handleSave },
               h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' } },
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Título'),
-                    h('input', { className: 'form-control', required: true, value: formData.title, onChange: e => setFormData({ ...formData, title: e.target.value }) })
-                  ),
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Fecha'),
-                    h('input', { type: 'date', className: 'form-control', required: true, value: formData.date, onChange: e => setFormData({ ...formData, date: e.target.value }) })
-                  ),
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Hora'),
-                    h('input', { type: 'time', className: 'form-control', value: formData.time || '', onChange: e => setFormData({ ...formData, time: e.target.value }) })
+                h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                  h('label', { className: 'form-label' }, 'Título / Nombre del Recurso'),
+                  h('input', {
+                    className: 'form-control',
+                    required: true,
+                    placeholder: 'Ej: Temporalización 4º ESO - Lengua Castellana',
+                    value: formData.title,
+                    onChange: e => setFormData({ ...formData, title: e.target.value })
+                  })
+                ),
+                h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                  h('label', { className: 'form-label' }, 'Dirección URL de la Página Web'),
+                  h('input', {
+                    type: 'text',
+                    className: 'form-control',
+                    required: true,
+                    placeholder: 'https://ejemplo.com/documento-temporalizacion',
+                    value: formData.url,
+                    onChange: e => setFormData({ ...formData, url: e.target.value })
+                  })
+                ),
+                h('div', { className: 'form-group', style: { marginBottom: 0 } },
+                  h('label', { className: 'form-label' }, 'Categoría / Nivel'),
+                  h('select', {
+                    className: 'form-control',
+                    value: formData.category,
+                    onChange: e => setFormData({ ...formData, category: e.target.value }),
+                    style: { fontWeight: 600 }
+                  },
+                    categories.map(c => h('option', { key: c, value: c }, c))
                   )
                 ),
                 h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                  h('label', { className: 'form-label' }, 'Tipo de Sesión'),
-                  h('select', { className: 'form-control', value: formData.meetingType, onChange: e => setFormData({ ...formData, meetingType: e.target.value }), style: { fontWeight: 600 } },
-                    h('option', { value: 'Ordinaria' }, 'Ordinaria'),
-                    h('option', { value: 'Extraordinaria' }, 'Extraordinaria')
-                  )
-                ),
-                h('div', { className: 'form-group', style: { background: '#FDF2F4', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #FCA5A5' } },
-                  h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
-                    h('label', { className: 'form-label', style: { color: 'var(--burgundy)', margin: 0 } }, '👥 Profesores Asistentes a la Reunión'),
-                    h('div', { style: { display: 'flex', gap: '0.35rem' } },
-                      h('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.725rem' }, onClick: () => setFormData({ ...formData, attendees: DEFAULT_DEPT_TEACHERS.join(', ') }) }, 'Seleccionar Todos'),
-                      h('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.725rem', color: 'var(--burgundy)' }, onClick: () => setFormData({ ...formData, attendees: '' }) }, 'Desmarcar Todos')
-                    )
-                  ),
-                  h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.45rem', margin: '0.4rem 0 0.65rem' } },
-                    DEFAULT_DEPT_TEACHERS.map(teacher => {
-                      const isChecked = currentAttendeeNames.includes(teacher);
-                      return h('label', {
-                        key: teacher,
-                        style: {
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          background: isChecked ? '#FFFFFF' : 'rgba(255,255,255,0.5)',
-                          padding: '0.35rem 0.5rem',
-                          borderRadius: 'var(--radius-sm)',
-                          border: isChecked ? '1px solid var(--burgundy)' : '1px solid var(--border-subtle)',
-                          cursor: 'pointer',
-                          fontSize: '0.775rem',
-                          fontWeight: isChecked ? 600 : 400
-                        }
-                      },
-                        h('input', { type: 'checkbox', checked: isChecked, onChange: () => handleToggleTeacherAttendee(teacher), style: { accentColor: 'var(--burgundy)' } }),
-                        h('span', { style: { color: isChecked ? 'var(--burgundy)' : 'var(--text-secondary)' } }, teacher)
-                      );
-                    })
-                  ),
-                  h('input', { className: 'form-control', value: formData.attendees, onChange: e => setFormData({ ...formData, attendees: e.target.value }), style: { fontSize: '0.825rem' } })
-                ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '📋 Orden del Día'),
-                  h(RichTextEditor, { value: formData.agenda, onChange: html => setFormData(p => ({ ...p, agenda: html })), placeholder: 'Puntos del orden del día...' })
-                ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h(RichTextEditor, { value: formData.agreements, onChange: html => setFormData(p => ({ ...p, agreements: html })), placeholder: 'Acuerdos y decisiones adoptadas...' })
-                ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                  h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
+                  h('label', { className: 'form-label' }, 'Descripción / Notas'),
+                  h('textarea', {
+                    className: 'form-control',
+                    rows: 3,
+                    placeholder: 'Breve descripción de los contenidos o enlace...',
+                    value: formData.description,
+                    onChange: e => setFormData({ ...formData, description: e.target.value })
+                  })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
-                  h('input', { type: 'checkbox', id: 'chk_important_dept', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
-                  h('label', { htmlFor: 'chk_important_dept', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '⭐ Marcar este documento como Importante')
+                  h('input', {
+                    type: 'checkbox',
+                    id: 'chk_pinned_temp',
+                    checked: formData.pinned,
+                    onChange: e => setFormData({ ...formData, pinned: e.target.checked })
+                  }),
+                  h('label', { htmlFor: 'chk_pinned_temp', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '📌 Fijar en la parte superior')
                 )
               ),
               h('div', { className: 'modal-footer' },
-                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setShowAdd(false) }, 'Cancelar'),
-                h('button', { type: 'submit', className: 'btn btn-gold' }, 'Guardar Documento Departamento')
+                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setShowModal(false) }, 'Cancelar'),
+                h('button', { type: 'submit', className: 'btn btn-gold' }, 'Guardar Enlace')
               )
             )
           )
