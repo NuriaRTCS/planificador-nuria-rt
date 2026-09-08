@@ -2749,6 +2749,16 @@
         orderedSlots = [...currentSlots, ...futureSlots, ...pastSlots];
       }
 
+      // Filter slots: show only sessions with active official schedule activity or custom data
+      const visibleSlots = orderedSlots.filter(({ slot }) => {
+        const officialActivity = getScheduleActivity(teacherSchedule, dayKey, slot.time);
+        const slotData = daySlotsData[slot.time];
+        const blocks = slotData?.blocks || [];
+        const hasCustomData = Boolean(slotData && (slotData.subject || blocks.some(b => b.text || b.type)));
+        const hasOfficialActivity = Boolean(officialActivity && officialActivity !== '—' && officialActivity.trim() !== '');
+        return hasOfficialActivity || hasCustomData;
+      });
+
       return h('div', { className: 'modal-overlay', onClick: onClose },
         h('div', {
           className: 'modal-content',
@@ -2767,7 +2777,19 @@
           ),
 
           h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '0.85rem', overflowY: 'auto', padding: '1rem 0.35rem' } },
-            orderedSlots.map(({ slot, status }) => {
+            visibleSlots.length === 0 ? h('div', {
+              style: {
+                padding: '2.5rem 1rem',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                background: 'var(--bg-card-subtle)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px dashed var(--border-subtle)'
+              }
+            },
+              h('p', { style: { fontSize: '1.05rem', fontWeight: 600, color: 'var(--ink-blue)' } }, '☕ Sin sesiones asignadas en el Horario Docente'),
+              h('p', { style: { fontSize: '0.85rem', marginTop: '0.35rem' } }, 'No hay clases, guardias ni actividades registradas en el horario oficial para este día.')
+            ) : visibleSlots.map(({ slot, status }) => {
               const slotData = daySlotsData[slot.time];
               const blocks = slotData?.blocks || [];
               const officialActivity = getScheduleActivity(teacherSchedule, dayKey, slot.time);
