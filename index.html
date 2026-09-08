@@ -1200,13 +1200,14 @@
               .replace(/Literatura Universal\s*1[ºª]?\s*\/\s*2[ºª]?\s*Bachillerato/gi, 'Literatura Universal')
               .replace(/Atenci[oó]n\s*Familias/gi, 'Atenció famílies')
               .replace(/Guardia de Patio/gi, 'Guàrdia de Pati')
-              .replace(/Guardia de Biblioteca/gi, 'Guàrdia de Biblioteca');
+              .replace(/Guardia de Biblioteca/gi, 'Guàrdia de Biblioteca')
+              .replace(/Patio\s*\/\s*Biblioteca/gi, 'Guàrdia de Biblioteca');
           }
         });
         if (updatedRow.time === '10:45 – 11:10') {
-          if (updatedRow.wednesday === 'Patio / Biblioteca' || updatedRow.wednesday === 'Guardia de Patio') updatedRow.wednesday = 'Guàrdia de Pati';
+          if (updatedRow.wednesday === 'Patio / Biblioteca' || updatedRow.wednesday === 'Patio/Biblioteca' || updatedRow.wednesday === 'Guardia de Patio') updatedRow.wednesday = 'Guàrdia de Pati';
           if (updatedRow.tuesday === 'Guardia de Patio') updatedRow.tuesday = 'Guàrdia de Pati';
-          if (updatedRow.thursday === 'Recreo' || updatedRow.thursday === 'Guardia de Biblioteca') updatedRow.thursday = 'Guàrdia de Biblioteca';
+          if (/patio\s*\/\s*biblioteca|recreo|guardia/i.test(updatedRow.thursday)) updatedRow.thursday = 'Guàrdia de Biblioteca';
         }
         if (updatedRow.time === '13:55 – 14:05') {
           if (updatedRow.thursday === 'Descanso') updatedRow.thursday = '—';
