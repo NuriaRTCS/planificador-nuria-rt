@@ -1789,8 +1789,15 @@
         const checkSync = () => {
           const pin = localStorage.getItem('planificador_sync_pin') || "584920";
           autoFetchFromCloud(pin, (newData) => {
-            setData(newData);
-            setAutoSyncStatus('🟢 Actualizado automáticamente');
+            if (newData && typeof newData === 'object') {
+              setData({
+                ...newData,
+                calendarEvents: sanitizeCalendarEvents(Array.isArray(newData.calendarEvents) ? newData.calendarEvents : INITIAL_DATA.calendarEvents),
+                teacherSchedule: (Array.isArray(newData.teacherSchedule) && newData.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(newData.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
+                groups: (Array.isArray(newData.groups) && newData.groups.length > 0) ? sanitizeGroups(newData.groups) : INITIAL_GROUPS
+              });
+              setAutoSyncStatus('🟢 Actualizado automáticamente');
+            }
           });
         };
 
@@ -3254,6 +3261,43 @@
         }
       });
       const [copySuccessMsg, setCopySuccessMsg] = useState('');
+      const [draggedIdx, setDraggedIdx] = useState(null);
+      const [dragOverIdx, setDragOverIdx] = useState(null);
+
+      const handleDragStart = (e, index) => {
+        e.dataTransfer.setData('text/plain', String(index));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedIdx(index);
+      };
+
+      const handleDragOver = (e, index) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverIdx !== index) {
+          setDragOverIdx(index);
+        }
+      };
+
+      const handleDrop = (e, targetIdx) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === undefined) return;
+        if (draggedIdx === targetIdx) {
+          setDraggedIdx(null);
+          setDragOverIdx(null);
+          return;
+        }
+        const updated = [...blocks];
+        const [movedBlock] = updated.splice(draggedIdx, 1);
+        updated.splice(targetIdx, 0, movedBlock);
+        setBlocks(updated);
+        setDraggedIdx(null);
+        setDragOverIdx(null);
+      };
+
+      const handleDragEnd = () => {
+        setDraggedIdx(null);
+        setDragOverIdx(null);
+      };
 
       const handleAddBlock = () => {
         setBlocks([...blocks, { type: 'explicacion', text: '' }]);
@@ -3431,50 +3475,85 @@
                     }, '➕ Añadir Bloque')
                   )
                 ),
-                h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '0.45rem' } }, '🔗 Usa "🔗 Enlazar Texto" para crear hipervínculos y "🔗❌" para eliminar el enlace conservando el texto.'),
+                h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '0.45rem' } }, '🔗 Usa "🔗 Enlazar Texto" para hipervínculos. Arrastra el icono ✋ a la izquierda de cualquier bloque para reordenarlo.'),
                 blocks.length === 0 ? h('div', { style: { padding: '0.85rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque"' + (copiedBlock ? ' o en "📋 Pegar Bloque Copiado".' : '.')) :
                 h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem' } },
-                  blocks.map((blk, bIdx) => h('div', { key: bIdx, style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                    h('select', {
-                      className: 'form-control',
-                      style: { width: '130px', padding: '0.35rem', fontSize: '0.775rem' },
-                      value: blk.type,
-                      onChange: e => handleBlockChange(bIdx, 'type', e.target.value)
+                  blocks.map((blk, bIdx) => {
+                    const isDraggingThis = draggedIdx === bIdx;
+                    const isOverThis = dragOverIdx === bIdx;
+
+                    return h('div', {
+                      key: bIdx,
+                      onDragOver: (e) => handleDragOver(e, bIdx),
+                      onDrop: (e) => handleDrop(e, bIdx),
+                      onDragEnd: handleDragEnd,
+                      style: {
+                        display: 'flex',
+                        gap: '0.35rem',
+                        alignItems: 'center',
+                        padding: '0.35rem 0.45rem',
+                        borderRadius: 'var(--radius-md)',
+                        background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : 'var(--bg-card-subtle)'),
+                        border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : '1px solid var(--border-subtle)'),
+                        opacity: isDraggingThis ? 0.5 : 1,
+                        transition: 'all 0.15s ease'
+                      }
                     },
-                      LESSON_TYPES.map(l => h('option', { key: l.key, value: l.key }, l.label))
-                    ),
-                    h('textarea', {
-                      className: 'form-control',
-                      style: { flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.825rem', fontFamily: 'inherit', resize: 'vertical', minHeight: '42px', rows: 2, lineHeight: 1.35 },
-                      placeholder: 'Contenido del bloque (ej. Ejercicios 1 al 5 pág 23)...',
-                      value: blk.text || '',
-                      onChange: e => handleBlockChange(bIdx, 'text', e.target.value)
-                    }),
-                    h('button', {
-                      type: 'button',
-                      onClick: () => handleInsertLinkToBlock(bIdx),
-                      style: { border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
-                      title: '🔗 Enlazar este texto con una dirección web'
-                    }, '🔗'),
-                    (blk.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(blk.text)) && h('button', {
-                      type: 'button',
-                      onClick: () => handleRemoveLinkFromBlock(bIdx),
-                      style: { border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.2rem' },
-                      title: '🔗❌ Quitar hipervínculo manteniendo el texto'
-                    }, '🔗❌'),
-                    h('button', {
-                      type: 'button',
-                      onClick: () => handleCopyBlock(blk),
-                      style: { border: 'none', background: 'none', color: 'var(--ink-blue)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
-                      title: 'Copiar este bloque de trabajo para pegarlo en otra sesión'
-                    }, '📋'),
-                    h('button', {
-                      type: 'button',
-                      onClick: () => handleRemoveBlock(bIdx),
-                      style: { border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
-                      title: 'Eliminar bloque'
-                    }, '🗑️')
-                  ))
+                      h('span', {
+                        draggable: true,
+                        onDragStart: (e) => handleDragStart(e, bIdx),
+                        style: {
+                          cursor: 'grab',
+                          userSelect: 'none',
+                          color: 'var(--gold-accent)',
+                          fontSize: '1.15rem',
+                          padding: '0 0.25rem',
+                          display: 'flex',
+                          alignItems: 'center'
+                        },
+                        title: 'Arrastra este icono para reordenar el bloque arriba o abajo'
+                      }, '✋'),
+                      h('select', {
+                        className: 'form-control',
+                        style: { width: '130px', padding: '0.35rem', fontSize: '0.775rem' },
+                        value: blk.type,
+                        onChange: e => handleBlockChange(bIdx, 'type', e.target.value)
+                      },
+                        LESSON_TYPES.map(l => h('option', { key: l.key, value: l.key }, l.label))
+                      ),
+                      h('textarea', {
+                        className: 'form-control',
+                        style: { flex: 1, padding: '0.4rem 0.5rem', fontSize: '0.825rem', fontFamily: 'inherit', resize: 'vertical', minHeight: '42px', rows: 2, lineHeight: 1.35 },
+                        placeholder: 'Contenido del bloque (ej. Ejercicios 1 al 5 pág 23)...',
+                        value: blk.text || '',
+                        onChange: e => handleBlockChange(bIdx, 'text', e.target.value)
+                      }),
+                      h('button', {
+                        type: 'button',
+                        onClick: () => handleInsertLinkToBlock(bIdx),
+                        style: { border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                        title: '🔗 Enlazar este texto con una dirección web'
+                      }, '🔗'),
+                      (blk.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(blk.text)) && h('button', {
+                        type: 'button',
+                        onClick: () => handleRemoveLinkFromBlock(bIdx),
+                        style: { border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.2rem' },
+                        title: '🔗❌ Quitar hipervínculo manteniendo el texto'
+                      }, '🔗❌'),
+                      h('button', {
+                        type: 'button',
+                        onClick: () => handleCopyBlock(blk),
+                        style: { border: 'none', background: 'none', color: 'var(--ink-blue)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                        title: 'Copiar este bloque de trabajo para pegarlo en otra sesión'
+                      }, '📋'),
+                      h('button', {
+                        type: 'button',
+                        onClick: () => handleRemoveBlock(bIdx),
+                        style: { border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                        title: 'Eliminar bloque'
+                      }, '🗑️')
+                    );
+                  })
                 )
               )
             ),
@@ -5275,6 +5354,45 @@
       const [sortBy, setSortBy] = useState('manual');
       const [newNote, setNewNote] = useState({ title: '', category: 'General', content: '' });
 
+      const [draggedId, setDraggedId] = useState(null);
+      const [dragOverId, setDragOverId] = useState(null);
+
+      const handleDragStart = (e, id) => {
+        e.dataTransfer.setData('text/plain', String(id));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedId(id);
+      };
+
+      const handleDragOver = (e, id) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverId !== id) setDragOverId(id);
+      };
+
+      const handleDrop = (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) {
+          setDraggedId(null);
+          setDragOverId(null);
+          return;
+        }
+        const fromIdx = notes.findIndex(item => item.id === draggedId);
+        const toIdx = notes.findIndex(item => item.id === targetId);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const updated = [...notes];
+          const [movedItem] = updated.splice(fromIdx, 1);
+          updated.splice(toIdx, 0, movedItem);
+          setNotes(updated);
+        }
+        setDraggedId(null);
+        setDragOverId(null);
+      };
+
+      const handleDragEnd = () => {
+        setDraggedId(null);
+        setDragOverId(null);
+      };
+
       const handleAdd = (e) => {
         e.preventDefault();
         if (!newNote.content || newNote.content === '<br>') return;
@@ -5351,26 +5469,54 @@
           )
         ),
         h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' } },
-          sortedNotes.map(n => h('div', { key: n.id, className: 'card', style: { display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
-            h('div', null,
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
-                h('span', { className: `badge ${getNoteCategoryBadgeClass(n.category)}` }, n.category),
-                h('div', { style: { display: 'flex', gap: '0.2rem', alignItems: 'center' } },
-                  sortBy === 'manual' && h(React.Fragment, null,
-                    h('button', { type: 'button', onClick: () => handleMoveUp(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▲'),
-                    h('button', { type: 'button', onClick: () => handleMoveDown(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▼')
+          sortedNotes.map(n => {
+            const isDraggingThis = draggedId === n.id;
+            const isOverThis = dragOverId === n.id;
+
+            return h('div', {
+              key: n.id,
+              className: 'card',
+              onDragOver: (e) => handleDragOver(e, n.id),
+              onDrop: (e) => handleDrop(e, n.id),
+              onDragEnd: handleDragEnd,
+              style: {
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
+                border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
+                opacity: isDraggingThis ? 0.5 : 1,
+                transition: 'all 0.15s ease'
+              }
+            },
+              h('div', null,
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.35rem' } },
+                    h('span', {
+                      draggable: true,
+                      onDragStart: (e) => handleDragStart(e, n.id),
+                      style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
+                      title: 'Arrastra este icono ✋ para reordenar la nota'
+                    }, '✋'),
+                    h('span', { className: `badge ${getNoteCategoryBadgeClass(n.category)}` }, n.category)
                   ),
-                  h(DownloadMenu, { title: n.title, sections: [{ label: `Categoría: ${n.category} | Fecha: ${formatDateDDMMYYYY(n.date)}`, content: n.content }] }),
-                  h('button', { onClick: () => { if (window.confirm('¿Estás seguro/a de que deseas eliminar esta nota docente?')) setNotes(notes.filter(item => item.id !== n.id)); }, style: { border: 'none', background: 'none', cursor: 'pointer', marginLeft: '0.25rem' }, title: 'Eliminar nota' }, '🗑️')
-                )
+                  h('div', { style: { display: 'flex', gap: '0.2rem', alignItems: 'center' } },
+                    sortBy === 'manual' && h(React.Fragment, null,
+                      h('button', { type: 'button', onClick: () => handleMoveUp(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▲'),
+                      h('button', { type: 'button', onClick: () => handleMoveDown(n.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.1rem 0.35rem', cursor: 'pointer', fontSize: '0.7rem' } }, '▼')
+                    ),
+                    h(DownloadMenu, { title: n.title, sections: [{ label: `Categoría: ${n.category} | Fecha: ${formatDateDDMMYYYY(n.date)}`, content: n.content }] }),
+                    h('button', { onClick: () => { if (window.confirm('¿Estás seguro/a de que deseas eliminar esta nota docente?')) setNotes(notes.filter(item => item.id !== n.id)); }, style: { border: 'none', background: 'none', cursor: 'pointer', marginLeft: '0.25rem' }, title: 'Eliminar nota' }, '🗑️')
+                  )
+                ),
+                h('h3', { style: { fontSize: '1.15rem', marginBottom: '0.4rem' } }, n.title),
+                h('div', { className: 'note-content-html rte-content', style: { fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }, dangerouslySetInnerHTML: { __html: processRteHtml(n.content) } })
               ),
-              h('h3', { style: { fontSize: '1.15rem', marginBottom: '0.4rem' } }, n.title),
-              h('div', { className: 'note-content-html rte-content', style: { fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }, dangerouslySetInnerHTML: { __html: processRteHtml(n.content) } })
-            ),
-            h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' } },
-              h('span', null, `📅 Creación: ${formatDateDDMMYYYY(n.date)}`)
-            )
-          ))
+              h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between' } },
+                h('span', null, `📅 Creación: ${formatDateDDMMYYYY(n.date)}`)
+              )
+            );
+          })
         ),
         showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '800px' }, onClick: e => e.stopPropagation() },
@@ -5421,6 +5567,45 @@
       const [sortBy, setSortBy] = useState('manual');
       const [editingMeeting, setEditingMeeting] = useState(null);
       const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '', agenda: '', agreements: '', notes: '', important: false });
+
+      const [draggedId, setDraggedId] = useState(null);
+      const [dragOverId, setDragOverId] = useState(null);
+
+      const handleDragStart = (e, id) => {
+        e.dataTransfer.setData('text/plain', String(id));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedId(id);
+      };
+
+      const handleDragOver = (e, id) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverId !== id) setDragOverId(id);
+      };
+
+      const handleDrop = (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) {
+          setDraggedId(null);
+          setDragOverId(null);
+          return;
+        }
+        const fromIdx = meetings.findIndex(item => item.id === draggedId);
+        const toIdx = meetings.findIndex(item => item.id === targetId);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const updated = [...meetings];
+          const [movedItem] = updated.splice(fromIdx, 1);
+          updated.splice(toIdx, 0, movedItem);
+          setMeetings(updated);
+        }
+        setDraggedId(null);
+        setDragOverId(null);
+      };
+
+      const handleDragEnd = () => {
+        setDraggedId(null);
+        setDragOverId(null);
+      };
 
       const handleOpenAdd = () => {
         setFormData({ title: `Reunión CCP nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '16:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
@@ -5490,43 +5675,68 @@
           )
         ),
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-          sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--gold-accent)', padding: '1.25rem' } },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
-                h('span', { className: 'badge badge-gold' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
-                m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
-              ),
-              h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
-                sortBy === 'manual' && h(React.Fragment, null,
-                  h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
-                  h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
+          sortedMeetings.map(m => {
+            const isDraggingThis = draggedId === m.id;
+            const isOverThis = dragOverId === m.id;
+
+            return h('div', {
+              key: m.id,
+              className: `card ${m.important ? 'is-important' : ''}`,
+              onDragOver: (e) => handleDragOver(e, m.id),
+              onDrop: (e) => handleDrop(e, m.id),
+              onDragEnd: handleDragEnd,
+              style: {
+                borderLeft: '6px solid var(--gold-accent)',
+                padding: '1.25rem',
+                background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
+                border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
+                opacity: isDraggingThis ? 0.5 : 1,
+                transition: 'all 0.15s ease'
+              }
+            },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
+                h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+                  h('span', {
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, m.id),
+                    style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
+                    title: 'Arrastra este icono ✋ para reordenar esta acta CCP'
+                  }, '✋'),
+                  h('span', { className: 'badge badge-gold' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
+                  m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
                 ),
-                h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
-                h(DownloadMenu, { title: m.title, sections: [
-                  { label: '📋 Orden del Día', content: m.agenda },
-                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
-                  { label: '📝 Notas Adicionales', content: m.notes }
-                ]}),
-                h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
-              )
-            ),
-            h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.75rem' } }, m.title),
-            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
+                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                  h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
+                  sortBy === 'manual' && h(React.Fragment, null,
+                    h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
+                    h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
+                  ),
+                  h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
+                  h(DownloadMenu, { title: m.title, sections: [
+                    { label: '📋 Orden del Día', content: m.agenda },
+                    { label: '✅ Acuerdos Adoptados', content: m.agreements },
+                    { label: '📝 Notas Adicionales', content: m.notes }
+                  ]}),
+                  h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
+                )
               ),
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
+              h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.75rem' } }, m.title),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
+                h('div', null,
+                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
+                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
+                ),
+                h('div', null,
+                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
+                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
+                )
+              ),
+              m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
+                h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
+                h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
               )
-            ),
-            m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
-            )
-          ))
+            );
+          })
         ),
         showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
@@ -5583,6 +5793,45 @@
       const [sortBy, setSortBy] = useState('manual');
       const [editingMeeting, setEditingMeeting] = useState(null);
       const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '', agenda: '', agreements: '', notes: '', important: false });
+
+      const [draggedId, setDraggedId] = useState(null);
+      const [dragOverId, setDragOverId] = useState(null);
+
+      const handleDragStart = (e, id) => {
+        e.dataTransfer.setData('text/plain', String(id));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedId(id);
+      };
+
+      const handleDragOver = (e, id) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverId !== id) setDragOverId(id);
+      };
+
+      const handleDrop = (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) {
+          setDraggedId(null);
+          setDragOverId(null);
+          return;
+        }
+        const fromIdx = meetings.findIndex(item => item.id === draggedId);
+        const toIdx = meetings.findIndex(item => item.id === targetId);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const updated = [...meetings];
+          const [movedItem] = updated.splice(fromIdx, 1);
+          updated.splice(toIdx, 0, movedItem);
+          setMeetings(updated);
+        }
+        setDraggedId(null);
+        setDragOverId(null);
+      };
+
+      const handleDragEnd = () => {
+        setDraggedId(null);
+        setDragOverId(null);
+      };
 
       const handleOpenAdd = () => {
         setFormData({ title: `Claustro nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '17:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
@@ -5652,43 +5901,68 @@
           )
         ),
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-          sortedMeetings.map(m => h('div', { key: m.id, className: `card ${m.important ? 'is-important' : ''}`, style: { borderLeft: '6px solid var(--ink-blue)', padding: '1.25rem' } },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-              h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
-                h('span', { className: 'badge badge-ink' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
-                m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
-              ),
-              h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
-                sortBy === 'manual' && h(React.Fragment, null,
-                  h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
-                  h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
+          sortedMeetings.map(m => {
+            const isDraggingThis = draggedId === m.id;
+            const isOverThis = dragOverId === m.id;
+
+            return h('div', {
+              key: m.id,
+              className: `card ${m.important ? 'is-important' : ''}`,
+              onDragOver: (e) => handleDragOver(e, m.id),
+              onDrop: (e) => handleDrop(e, m.id),
+              onDragEnd: handleDragEnd,
+              style: {
+                borderLeft: '6px solid var(--ink-blue)',
+                padding: '1.25rem',
+                background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
+                border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
+                opacity: isDraggingThis ? 0.5 : 1,
+                transition: 'all 0.15s ease'
+              }
+            },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
+                h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+                  h('span', {
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, m.id),
+                    style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
+                    title: 'Arrastra este icono ✋ para reordenar esta acta de Claustro'
+                  }, '✋'),
+                  h('span', { className: 'badge badge-ink' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
+                  m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
                 ),
-                h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
-                h(DownloadMenu, { title: m.title, sections: [
-                  { label: '📋 Orden del Día', content: m.agenda },
-                  { label: '✅ Acuerdos Adoptados', content: m.agreements },
-                  { label: '📝 Notas Adicionales', content: m.notes }
-                ]}),
-                h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
-              )
-            ),
-            h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.75rem' } }, m.title),
-            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
+                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                  h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
+                  sortBy === 'manual' && h(React.Fragment, null,
+                    h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
+                    h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
+                  ),
+                  h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
+                  h(DownloadMenu, { title: m.title, sections: [
+                    { label: '📋 Orden del Día', content: m.agenda },
+                    { label: '✅ Acuerdos Adoptados', content: m.agreements },
+                    { label: '📝 Notas Adicionales', content: m.notes }
+                  ]}),
+                  h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
+                )
               ),
-              h('div', null,
-                h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
+              h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.75rem' } }, m.title),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
+                h('div', null,
+                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
+                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
+                ),
+                h('div', null,
+                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
+                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
+                )
+              ),
+              m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
+                h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
+                h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
               )
-            ),
-            m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-              h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-              h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
-            )
-          ))
+            );
+          })
         ),
         showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
@@ -5746,6 +6020,45 @@
       const [searchQuery, setSearchQuery] = useState('');
       const [selectedCategory, setSelectedCategory] = useState('Todas');
       const [sortBy, setSortBy] = useState('lastUsed'); // 'lastUsed' | 'manual'
+
+      const [draggedId, setDraggedId] = useState(null);
+      const [dragOverId, setDragOverId] = useState(null);
+
+      const handleDragStart = (e, id) => {
+        e.dataTransfer.setData('text/plain', String(id));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggedId(id);
+      };
+
+      const handleDragOver = (e, id) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (dragOverId !== id) setDragOverId(id);
+      };
+
+      const handleDrop = (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) {
+          setDraggedId(null);
+          setDragOverId(null);
+          return;
+        }
+        const fromIdx = items.findIndex(item => item.id === draggedId);
+        const toIdx = items.findIndex(item => item.id === targetId);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const updated = [...items];
+          const [movedItem] = updated.splice(fromIdx, 1);
+          updated.splice(toIdx, 0, movedItem);
+          setItems(updated);
+        }
+        setDraggedId(null);
+        setDragOverId(null);
+      };
+
+      const handleDragEnd = () => {
+        setDraggedId(null);
+        setDragOverId(null);
+      };
 
       const categories = ['4º ESO', '1º Bachillerato', 'Literatura Universal', 'Otros'];
 
@@ -5908,71 +6221,91 @@
           h('p', { style: { fontSize: '1.1rem', fontWeight: 500 } }, 'No se encontraron enlaces de temporalizaciones.'),
           h('p', { style: { fontSize: '0.875rem', marginTop: '0.4rem' } }, 'Añade un nuevo enlace haciendo clic en "+ Añadir Temporalización".')
         ) : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.15rem' } },
-          filteredItems.map(item => h('div', {
-            key: item.id,
-            className: `card ${item.pinned ? 'is-important' : ''}`,
-            style: {
-              borderLeft: item.pinned ? '6px solid var(--gold-accent)' : '6px solid var(--ink-blue)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              padding: '1.15rem'
-            }
-          },
-            h('div', null,
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' } },
-                h('span', {
-                  className: 'badge',
-                  style: { background: '#F0F4F8', color: 'var(--ink-blue)', border: '1px solid var(--border-subtle)', fontWeight: 600 }
-                }, `🏷️ ${categories.includes(item.category) ? item.category : 'Otros'}`),
-                h('div', { style: { display: 'flex', gap: '0.3rem', alignItems: 'center' } },
-                  sortBy === 'manual' && h(React.Fragment, null,
-                    h('button', {
-                      type: 'button',
-                      title: 'Mover arriba',
-                      onClick: () => handleMoveUp(item.id),
-                      style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
-                    }, '▲'),
-                    h('button', {
-                      type: 'button',
-                      title: 'Mover abajo',
-                      onClick: () => handleMoveDown(item.id),
-                      style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
-                    }, '▼')
+          filteredItems.map(item => {
+            const isDraggingThis = draggedId === item.id;
+            const isOverThis = dragOverId === item.id;
+
+            return h('div', {
+              key: item.id,
+              className: `card ${item.pinned ? 'is-important' : ''}`,
+              onDragOver: (e) => handleDragOver(e, item.id),
+              onDrop: (e) => handleDrop(e, item.id),
+              onDragEnd: handleDragEnd,
+              style: {
+                borderLeft: item.pinned ? '6px solid var(--gold-accent)' : '6px solid var(--ink-blue)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '1.15rem',
+                background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
+                border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
+                opacity: isDraggingThis ? 0.5 : 1,
+                transition: 'all 0.15s ease'
+              }
+            },
+              h('div', null,
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.35rem' } },
+                    h('span', {
+                      draggable: true,
+                      onDragStart: (e) => handleDragStart(e, item.id),
+                      style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
+                      title: 'Arrastra este icono ✋ para reordenar la temporalización'
+                    }, '✋'),
+                    h('span', {
+                      className: 'badge',
+                      style: { background: '#F0F4F8', color: 'var(--ink-blue)', border: '1px solid var(--border-subtle)', fontWeight: 600 }
+                    }, `🏷️ ${categories.includes(item.category) ? item.category : 'Otros'}`)
                   ),
-                  h('button', {
-                    type: 'button',
-                    title: item.pinned ? 'Desfijar' : 'Fijar arriba',
-                    onClick: () => handleTogglePin(item.id),
-                    style: { background: item.pinned ? '#FEF08A' : 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.85rem' }
-                  }, item.pinned ? '📌 Fijado' : '📌'),
-                  h('button', {
-                    type: 'button',
-                    className: 'btn btn-secondary',
-                    onClick: () => handleOpenEdit(item),
-                    style: { padding: '0.2rem 0.45rem', fontSize: '0.75rem' }
-                  }, '✏️'),
-                  h('button', {
-                    type: 'button',
-                    onClick: () => handleDelete(item.id),
-                    style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }
-                  }, '🗑️')
-                )
+                  h('div', { style: { display: 'flex', gap: '0.3rem', alignItems: 'center' } },
+                    sortBy === 'manual' && h(React.Fragment, null,
+                      h('button', {
+                        type: 'button',
+                        title: 'Mover arriba',
+                        onClick: () => handleMoveUp(item.id),
+                        style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
+                      }, '▲'),
+                      h('button', {
+                        type: 'button',
+                        title: 'Mover abajo',
+                        onClick: () => handleMoveDown(item.id),
+                        style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' }
+                      }, '▼')
+                    ),
+                    h('button', {
+                      type: 'button',
+                      title: item.pinned ? 'Desfijar' : 'Fijar arriba',
+                      onClick: () => handleTogglePin(item.id),
+                      style: { background: item.pinned ? '#FEF08A' : 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.85rem' }
+                    }, item.pinned ? '📌 Fijado' : '📌'),
+                    h('button', {
+                      type: 'button',
+                      className: 'btn btn-secondary',
+                      onClick: () => handleOpenEdit(item),
+                      style: { padding: '0.2rem 0.45rem', fontSize: '0.75rem' }
+                    }, '✏️'),
+                    h('button', {
+                      type: 'button',
+                      onClick: () => handleDelete(item.id),
+                      style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }
+                    }, '🗑️')
+                  )
+                ),
+                h('h3', { style: { fontSize: '1.1rem', color: 'var(--ink-blue)', marginBottom: '0.35rem', lineHeight: '1.3' } }, item.title),
+                item.description && h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', lineHeight: '1.4' } }, item.description)
               ),
-              h('h3', { style: { fontSize: '1.1rem', color: 'var(--ink-blue)', marginBottom: '0.35rem', lineHeight: '1.3' } }, item.title),
-              item.description && h('p', { style: { fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.85rem', lineHeight: '1.4' } }, item.description)
-            ),
-            h('div', { style: { marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-start', alignItems: 'center' } },
-              h('a', {
-                href: item.url,
-                target: '_blank',
-                rel: 'noopener noreferrer',
-                onClick: () => handleOpenLink(item),
-                className: 'btn btn-primary',
-                style: { textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', fontSize: '0.825rem', fontWeight: 600 }
-              }, 'Abrir enlace 🔗')
-            )
-          ))
+              h('div', { style: { marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-start', alignItems: 'center' } },
+                h('a', {
+                  href: item.url,
+                  target: '_blank',
+                  rel: 'noopener noreferrer',
+                  onClick: () => handleOpenLink(item),
+                  className: 'btn btn-primary',
+                  style: { textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.85rem', fontSize: '0.825rem', fontWeight: 600 }
+                }, 'Abrir enlace 🔗')
+              )
+            );
+          })
         ),
 
         // Modal Form
