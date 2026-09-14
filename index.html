@@ -2910,7 +2910,7 @@
 
       const [currentMondayStr, setCurrentMondayStr] = useState(() => {
         if (targetDate) return getMondayOfDate(new Date(targetDate));
-        return plans[0]?.startDate || defaultMonday;
+        return defaultMonday;
       });
       const [selectedSlotTarget, setSelectedSlotTarget] = useState(null);
       const [expandedDayKey, setExpandedDayKey] = useState(null);
