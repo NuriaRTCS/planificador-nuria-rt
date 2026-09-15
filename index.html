@@ -1081,6 +1081,7 @@
     }
 
     const LESSON_TYPES = [
+      { key: 'ninguno', label: '— Sin categoría —', colorClass: '' },
       { key: 'explicacion', label: 'EXPLICACIÓN', colorClass: 'explicacion' },
       { key: 'correccion', label: 'CORRECCIÓN', colorClass: 'correccion' },
       { key: 'actividades', label: 'ACTIVIDADES', colorClass: 'actividades' },
@@ -2041,10 +2042,11 @@
             h('strong', { style: { color: 'var(--ink-blue)', textTransform: 'capitalize' } }, dayNameEs)
           )
         ),
-        h('div', { className: 'balanced-2x2-grid' },
-          // CARD 1
-          h('div', { className: 'card', style: { borderLeft: '4px solid var(--ink-blue)', padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
-            h('div', null,
+        h('div', { className: 'home-dashboard-layout', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: '1.15rem', alignItems: 'start' } },
+          /* COLUMN 1 (LEFT): PROGRAMACIÓN DE HOY + PRÓXIMAMENTE */
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
+            /* CARD 1: PROGRAMACIÓN DE HOY */
+            h('div', { className: 'card', style: { borderLeft: '4px solid var(--ink-blue)', padding: '1rem 1.15rem' } },
               h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
                 h('span', { className: 'badge badge-ink', style: { fontSize: '0.7rem' } }, '📌 PROGRAMACIÓN DE HOY'),
                 h('span', { style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }, 'Horario Escolar')
@@ -2060,7 +2062,6 @@
                   const item = todaySlots[slot.time] || {};
                   const official = getScheduleActivity(teacherSched, currentDayKey, slot.time);
                   
-                  // Calculate time status (current, future, past)
                   const times = (slot.time || '').split('-').map(s => s.trim());
                   const [sH, sM] = (times[0] || '08:00').split(':').map(Number);
                   const [eH, eM] = (times[1] || times[0] || '08:55').split(':').map(Number);
@@ -2074,7 +2075,6 @@
                   return { slot, item, official, status, startMins, endMins };
                 }).filter(x => x.official || x.item.subject || (x.item.blocks && x.item.blocks.length > 0));
 
-                // Sort: Active/Future slots FIRST (in chronological order), Past slots AT THE END
                 const activeOrFuture = todayCombined.filter(x => x.status !== 'past');
                 const pastSlots = todayCombined.filter(x => x.status === 'past');
                 const sortedCombined = [...activeOrFuture, ...pastSlots];
@@ -2111,7 +2111,6 @@
                         official ? h('span', { style: { padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.725rem', ...badgeStyle } }, formatPlannerText(official)) : (item.subject ? h('span', { style: { color: 'var(--gold-accent)' } }, `${item.subject} (${item.group || ''})`) : null)
                       ),
 
-                      /* RENDER PROGRAMMED WORK BLOCKS */
                       blocks.length > 0 ? h('div', { style: { marginTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
                         blocks.map((blk, bIdx) => {
                           const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
@@ -2128,7 +2127,7 @@
                               whiteSpace: 'pre-wrap'
                             }
                           },
-                            lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                            lessonObj && lessonObj.colorClass && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
                             h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
                           );
                         })
@@ -2138,80 +2137,15 @@
                 ) : h('div', { style: { textAlign: 'center', padding: '1rem 0.5rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' } },
                   h('p', { style: { fontSize: '0.85rem' } }, '📖 No hay clases programadas para hoy.')
                 );
-              })()
-            ),
-            h('div', { style: { marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.775rem' } },
-              h('span', { style: { color: 'var(--text-muted)' } }, `${todaySlotKeys.length} franjas ocupadas`),
-              h('button', { onClick: () => setCurrentSection('weekly'), style: { background: 'none', border: 'none', color: 'var(--gold-accent)', fontWeight: 600, cursor: 'pointer' } }, 'Ver semana →')
-            )
-          ),
-          // CARD 2
-          h('div', { className: 'card', style: { borderLeft: '4px solid var(--burgundy)', padding: '1rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, var(--burgundy-light) 100%)' } },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
-              h('span', { className: 'badge badge-burgundy', style: { fontSize: '0.7rem' } }, '⏳ CUENTA ATRÁS LECTIVA'),
-              h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, '2026/2027')
-            ),
-            h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
-              `Días Lectivos (${formatDateDDMMYYYY('2026-09-09')} a ${formatDateDDMMYYYY('2027-06-18')})`
-            ),
-            h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', margin: '0.65rem 0' } },
-              h('div', { style: { background: '#FFFFFF', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
-                h('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--burgundy)', lineHeight: 1.1 } }, remainingSchoolDays),
-                h('div', { style: { fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Restantes')
-              ),
-              h('div', { style: { background: '#FFFFFF', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
-                h('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--ink-blue)', lineHeight: 1.1 } }, totalSchoolDays),
-                h('div', { style: { fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Total Curso')
+              })(),
+              h('div', { style: { marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.775rem' } },
+                h('span', { style: { color: 'var(--text-muted)' } }, `${todaySlotKeys.length} franjas ocupadas`),
+                h('button', { onClick: () => setCurrentSection('weekly'), style: { background: 'none', border: 'none', color: 'var(--gold-accent)', fontWeight: 600, cursor: 'pointer' } }, 'Ver semana →')
               )
             ),
-            h('div', null,
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' } },
-                h('span', null, 'Progreso Curso'),
-                h('strong', null, `${progressPercent}% completado`)
-              ),
-              h('div', { style: { width: '100%', height: '8px', background: 'rgba(122, 38, 56, 0.15)', borderRadius: '4px', overflow: 'hidden' } },
-                h('div', { style: { width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold-accent), var(--burgundy))' } })
-              ),
-              daysUntilStart > 0 && h('div', { style: { marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--forest-green)', fontWeight: 600, textAlign: 'center' } },
-                `🌱 ¡Faltan ${daysUntilStart} días para el ${formatDateDDMMYYYY('2026-09-09')}!`
-              )
-            )
-          ),
-          // CARD 3: Mini Calendario
-          h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
-            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
-              h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)', textTransform: 'capitalize' } }, `📅 ${monthName}`),
-              h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                h('button', { onClick: () => { setCalMonth(today.getMonth()); setCalYear(today.getFullYear()); }, className: 'btn btn-gold', style: { padding: '0.15rem 0.5rem', fontSize: '0.725rem' } }, 'Hoy'),
-                h('button', { onClick: () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '◄'),
-                h('button', { onClick: () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '►')
-              )
-            ),
-            h('div', { className: 'mini-calendar-grid' },
-              h('div', { className: 'mini-cal-day-header' }, 'Lu'),
-              h('div', { className: 'mini-cal-day-header' }, 'Ma'),
-              h('div', { className: 'mini-cal-day-header' }, 'Mi'),
-              h('div', { className: 'mini-cal-day-header' }, 'Ju'),
-              h('div', { className: 'mini-cal-day-header' }, 'Vi'),
-              h('div', { className: 'mini-cal-day-header weekend' }, 'Sá'),
-              h('div', { className: 'mini-cal-day-header weekend' }, 'Do'),
-              calendarCells.map((c, i) => {
-                if (c.isOther) return h('div', { key: i, className: 'mini-cal-cell other-month' });
-                return h('div', {
-                  key: i,
-                  className: `mini-cal-cell ${c.isToday ? 'today' : ''} ${c.tagClass}`,
-                  onClick: () => setSelectedDateForNotes(c.dateStr),
-                  title: c.dayEvt ? `${c.dayEvt.title || ''} (${formatDateDDMMYYYY(c.dateStr)})` : `Anotación (${formatDateDDMMYYYY(c.dateStr)})`
-                },
-                  h('div', null, c.dayNum),
-                  c.hasVisibleMark && h('div', { style: { fontSize: '0.55rem', lineHeight: 1 } }, '📌')
-                );
-              })
-            )
-          ),
-          // CARD 4: Próximamente
-          h('div', { className: 'card', style: { padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
-            h('div', null,
+
+            /* CARD 4: PRÓXIMAMENTE */
+            h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
               h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' } },
                 h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)' } }, '📣 Próximamente'),
                 h('button', { className: 'btn btn-secondary', style: { padding: '0.2rem 0.55rem', fontSize: '0.725rem' }, onClick: () => setCurrentSection('calendar') }, 'Ver todos')
@@ -2224,6 +2158,75 @@
                   ),
                   h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, formatDateDDMMYYYY(evt.date))
                 ))
+              )
+            )
+          ),
+
+          /* COLUMN 2 (RIGHT): CUENTA ATRÁS LECTIVA (COMPACTA) + MINI CALENDARIO */
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
+            /* CARD 2: CUENTA ATRÁS LECTIVA (COMPACTA Y AJUSTADA AL TEXTO) */
+            h('div', { className: 'card', style: { borderLeft: '4px solid var(--burgundy)', padding: '0.85rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, var(--burgundy-light) 100%)', height: 'fit-content' } },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' } },
+                h('span', { className: 'badge badge-burgundy', style: { fontSize: '0.7rem' } }, '⏳ CUENTA ATRÁS LECTIVA'),
+                h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, '2026/2027')
+              ),
+              h('h3', { style: { fontSize: '1rem', color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
+                `Días Lectivos (${formatDateDDMMYYYY('2026-09-09')} a ${formatDateDDMMYYYY('2027-06-18')})`
+              ),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0' } },
+                h('div', { style: { background: '#FFFFFF', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--burgundy)', lineHeight: 1.1 } }, remainingSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Restantes')
+                ),
+                h('div', { style: { background: '#FFFFFF', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--ink-blue)', lineHeight: 1.1 } }, totalSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Total Curso')
+                )
+              ),
+              h('div', null,
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.725rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' } },
+                  h('span', null, 'Progreso Curso'),
+                  h('strong', null, `${progressPercent}% completado`)
+                ),
+                h('div', { style: { width: '100%', height: '7px', background: 'rgba(122, 38, 56, 0.15)', borderRadius: '4px', overflow: 'hidden' } },
+                  h('div', { style: { width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold-accent), var(--burgundy))' } })
+                ),
+                daysUntilStart > 0 && h('div', { style: { marginTop: '0.35rem', fontSize: '0.725rem', color: 'var(--forest-green)', fontWeight: 600, textAlign: 'center' } },
+                  `🌱 ¡Faltan ${daysUntilStart} días para el ${formatDateDDMMYYYY('2026-09-09')}!`
+                )
+              )
+            ),
+
+            /* CARD 3: MINI CALENDARIO */
+            h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
+                h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)', textTransform: 'capitalize' } }, `📅 ${monthName}`),
+                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                  h('button', { onClick: () => { setCalMonth(today.getMonth()); setCalYear(today.getFullYear()); }, className: 'btn btn-gold', style: { padding: '0.15rem 0.5rem', fontSize: '0.725rem' } }, 'Hoy'),
+                  h('button', { onClick: () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '◄'),
+                  h('button', { onClick: () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '►')
+                )
+              ),
+              h('div', { className: 'mini-calendar-grid' },
+                h('div', { className: 'mini-cal-day-header' }, 'Lu'),
+                h('div', { className: 'mini-cal-day-header' }, 'Ma'),
+                h('div', { className: 'mini-cal-day-header' }, 'Mi'),
+                h('div', { className: 'mini-cal-day-header' }, 'Ju'),
+                h('div', { className: 'mini-cal-day-header' }, 'Vi'),
+                h('div', { className: 'mini-cal-day-header weekend' }, 'Sá'),
+                h('div', { className: 'mini-cal-day-header weekend' }, 'Do'),
+                calendarCells.map((c, i) => {
+                  if (c.isOther) return h('div', { key: i, className: 'mini-cal-cell other-month' });
+                  return h('div', {
+                    key: i,
+                    className: `mini-cal-cell ${c.isToday ? 'today' : ''} ${c.tagClass}`,
+                    onClick: () => setSelectedDateForNotes(c.dateStr),
+                    title: c.dayEvt ? `${c.dayEvt.title || ''} (${formatDateDDMMYYYY(c.dateStr)})` : `Anotación (${formatDateDDMMYYYY(c.dateStr)})`
+                  },
+                    h('div', null, c.dayNum),
+                    c.hasVisibleMark && h('div', { style: { fontSize: '0.55rem', lineHeight: 1 } }, '📌')
+                  );
+                })
               )
             )
           )
@@ -2901,7 +2904,7 @@
                         whiteSpace: 'pre-wrap'
                       }
                     },
-                      lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.725rem', padding: '0.15rem 0.5rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                      lessonObj && lessonObj.colorClass && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.725rem', padding: '0.15rem 0.5rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
                       blk.text && h('span', { style: { color: 'var(--text-primary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
                     );
                   })
@@ -3192,7 +3195,7 @@
                                   whiteSpace: 'pre-wrap'
                                 }
                               },
-                                lessonObj && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.625rem', padding: '0.1rem 0.35rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
+                                lessonObj && lessonObj.colorClass && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.625rem', padding: '0.1rem 0.35rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
                                 blk.text && h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
                               );
                             })
