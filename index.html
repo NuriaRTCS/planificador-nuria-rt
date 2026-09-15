@@ -1716,6 +1716,7 @@
         } catch(e) {}
 
         if (remoteTime > localTime + 500) {
+          try { localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(remoteData)); } catch(e) {}
           onNewData(remoteData);
           return true;
         }
@@ -1737,6 +1738,8 @@
         setTargetWeeklyDate(dateStr);
         setCurrentSection('weekly');
       };
+
+      const isInitialMount = useRef(true);
 
       const [data, setData] = useState(() => {
         try {
@@ -1762,8 +1765,13 @@
         return INITIAL_DATA;
       });
 
-      // Auto-save to localStorage & debounced Auto-push to Cloud
+      // Auto-save to localStorage & debounced Auto-push to Cloud (skipped on initial render)
       useEffect(() => {
+        if (isInitialMount.current) {
+          isInitialMount.current = false;
+          return;
+        }
+
         const payload = { ...data, _lastUpdated: Date.now() };
         try {
           localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(payload));
@@ -1800,6 +1808,8 @@
             }
           });
         };
+
+        checkSync();
 
         const interval = setInterval(checkSync, 8000);
 
