@@ -11,12 +11,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- React & ReactDOM CDN -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- React & ReactDOM CDN (Multi-CDN with Fallbacks for Tablets & School Networks) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script>window.React || document.write('<script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>')</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script>window.ReactDOM || document.write('<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>')</script>
 
   <!-- SheetJS Library for Excel (.xlsx/.xls/.csv) Import -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin></script>
+  <script>window.XLSX || document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"><\/script>')</script>
 
   <style>
     :root {
@@ -483,12 +486,9 @@
     }
 
     @media (max-width: 1024px) {
-      .weekly-days-row-5 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-    }
-
-    @media (max-width: 850px) {
       .mobile-nav-toggle { display: flex; }
       .balanced-2x2-grid { grid-template-columns: 1fr; }
+      .weekly-days-row-5 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
       .month-day-cell { min-height: 44px; padding: 0.2rem; }
       .sidebar { position: fixed; left: -280px; top: 0; bottom: 0; z-index: 100; }
       .sidebar.open { transform: translateX(280px); }
@@ -700,6 +700,32 @@
   <!-- Native ES6 JavaScript rendering with React.createElement helper h(...) -->
   <script type="text/javascript">
     const { useState, useEffect, useRef, createElement: h } = React;
+
+    // Safe Storage Wrapper for iPad Safari Private Browsing & Strict Storage Limits
+    const memoryStorage = {};
+    const safeStorage = {
+      getItem: (key) => {
+        try {
+          return localStorage.getItem(key);
+        } catch (e) {
+          return memoryStorage[key] || null;
+        }
+      },
+      setItem: (key, val) => {
+        try {
+          localStorage.setItem(key, val);
+        } catch (e) {
+          memoryStorage[key] = String(val);
+        }
+      },
+      removeItem: (key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          delete memoryStorage[key];
+        }
+      }
+    };
 
     // --- OFFICIAL DEPARTMENT TEACHERS LIST ---
     const DEFAULT_DEPT_TEACHERS = [
@@ -1784,10 +1810,10 @@
           localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(payload));
         } catch (e) {}
 
-        let pin = localStorage.getItem('planificador_sync_pin');
+        let pin = safeStorage.getItem('planificador_sync_pin');
         if (!pin) {
           pin = "584920";
-          localStorage.setItem('planificador_sync_pin', pin);
+          safeStorage.setItem('planificador_sync_pin', pin);
         }
 
         setAutoSyncStatus('⚡ Guardando cambios...');
@@ -1802,7 +1828,7 @@
       // Periodic Auto-fetch and window focus listener for multi-device instant updates
       useEffect(() => {
         const checkSync = () => {
-          const pin = localStorage.getItem('planificador_sync_pin') || "584920";
+          const pin = safeStorage.getItem('planificador_sync_pin') || "584920";
           autoFetchFromCloud(pin, (newData) => {
             if (newData && typeof newData === 'object') {
               setData(prev => ({
@@ -6581,6 +6607,16 @@
       const formattedDate = formatDateDDMMYYYY(dateStr);
       const calEvt = (calendarEvents || []).find(e => e.date === dateStr);
 
+      const [copiedEvent, setCopiedEvent] = useState(() => {
+        try {
+          const saved = localStorage.getItem('monthly_copied_event');
+          return saved ? JSON.parse(saved) : null;
+        } catch (e) {
+          return null;
+        }
+      });
+      const [copyNotice, setCopyNotice] = useState('');
+
       const handleAddEvent = () => {
         const newEvt = {
           id: `m_evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
@@ -6600,16 +6636,32 @@
         }
       };
 
-      const handleDuplicateEvent = (idx) => {
+      const handleCopyEvent = (idx) => {
         const target = localEvents[idx];
         if (!target) return;
-        const duplicated = {
-          ...JSON.parse(JSON.stringify(target)),
+        const eventToCopy = {
+          text: target.text || '',
+          tag: target.tag || 'sin_categoria',
+          subtag: target.subtag || '',
+          time: target.time || ''
+        };
+        try {
+          localStorage.setItem('monthly_copied_event', JSON.stringify(eventToCopy));
+        } catch (e) {}
+        setCopiedEvent(eventToCopy);
+        setCopyNotice('📋 ¡Evento copiado! Abre cualquier otro día y pulsa "Pegar Evento Copiado".');
+        setTimeout(() => setCopyNotice(''), 3500);
+      };
+
+      const handlePasteEvent = () => {
+        if (!copiedEvent) return;
+        const pastedEvt = {
+          ...JSON.parse(JSON.stringify(copiedEvent)),
           id: `m_evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`
         };
-        const updated = [...localEvents];
-        updated.splice(idx + 1, 0, duplicated);
-        setLocalEvents(updated);
+        setLocalEvents([...localEvents, pastedEvt]);
+        setCopyNotice('✅ ¡Evento pegado en este día!');
+        setTimeout(() => setCopyNotice(''), 2500);
       };
 
       const handleRemoveEvent = (idx) => {
@@ -6759,11 +6811,32 @@
                   calEvt.details && h('div', { style: { fontSize: '0.775rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.3 } }, calEvt.details)
                 )
               ),
+              copyNotice && h('div', {
+                style: {
+                  background: '#ECFDF5',
+                  color: '#047857',
+                  border: '1px solid #6EE7B7',
+                  padding: '0.45rem 0.75rem',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  textAlign: 'center'
+                }
+              }, copyNotice),
               h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
                 h('span', { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-blue)' } }, `Eventos del día (${localEvents.length})`),
-                h('button', { type: 'button', className: 'btn btn-gold', style: { padding: '0.2rem 0.6rem', fontSize: '0.775rem' }, onClick: handleAddEvent }, '➕ Añadir Evento')
+                h('div', { style: { display: 'flex', gap: '0.4rem', alignItems: 'center' } },
+                  copiedEvent && h('button', {
+                    type: 'button',
+                    className: 'btn btn-secondary',
+                    style: { padding: '0.2rem 0.6rem', fontSize: '0.775rem', background: '#F0F9FF', color: '#0369A1', borderColor: '#BAE6FD', fontWeight: 600 },
+                    onClick: handlePasteEvent,
+                    title: `Pegar evento copiado: ${copiedEvent.text ? `"${copiedEvent.text}"` : (copiedEvent.tag || 'Evento')}`
+                  }, '📋 Pegar Evento Copiado'),
+                  h('button', { type: 'button', className: 'btn btn-gold', style: { padding: '0.2rem 0.6rem', fontSize: '0.775rem' }, onClick: handleAddEvent }, '➕ Añadir Evento')
+                )
               ),
-              localEvents.length === 0 ? h('div', { style: { padding: '1rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.825rem' } }, 'No hay eventos programados para este día. Pulsa "➕ Añadir Evento".') :
+              localEvents.length === 0 ? h('div', { style: { padding: '1rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.825rem' } }, 'No hay eventos programados para este día. Pulsa "➕ Añadir Evento" o "📋 Pegar Evento Copiado".') :
               h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.65rem' } },
                 localEvents.map((evt, idx) => {
                   const hasLink = evt.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(evt.text);
@@ -6786,7 +6859,7 @@
                       transition: 'all 0.15s ease'
                     }
                   },
-                    /* ROW 1: REORDER HANDLES, TAG, SUBTAG, TIME, DUPLICATE, DELETE */
+                    /* ROW 1: REORDER HANDLES, TAG, SUBTAG, TIME, COPY, DELETE */
                     h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' } },
                       h('div', { style: { display: 'flex', gap: '0.1rem', alignItems: 'center', cursor: 'grab' }, title: 'Arrastrar para reordenar' },
                         h('span', { style: { fontSize: '0.85rem', color: 'var(--text-muted)', paddingRight: '0.15rem' } }, '⋮⋮'),
@@ -6832,9 +6905,9 @@
                       h('div', { style: { marginLeft: 'auto', display: 'flex', gap: '0.2rem', alignItems: 'center' } },
                         h('button', {
                           type: 'button',
-                          onClick: () => handleDuplicateEvent(idx),
+                          onClick: () => handleCopyEvent(idx),
                           style: { border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.25rem' },
-                          title: 'Copiar / Duplicar este evento'
+                          title: 'Copiar este evento para pegarlo en cualquier día'
                         }, '📋'),
                         h('button', {
                           type: 'button',
@@ -7210,7 +7283,7 @@
 
     // --- BACKUP & SYNCHRONIZATION MODAL ---
     function BackupModal({ data, onImport, onReset, onClose }) {
-      const [syncPin, setSyncPin] = useState(() => localStorage.getItem('planificador_sync_pin') || '');
+      const [syncPin, setSyncPin] = useState(() => safeStorage.getItem('planificador_sync_pin') || '');
       const [syncStatus, setSyncStatus] = useState('');
       const [isSyncing, setIsSyncing] = useState(false);
       const [pasteCode, setPasteCode] = useState('');
@@ -7219,7 +7292,7 @@
       const generateRandomPin = () => {
         const pin = Math.floor(100000 + Math.random() * 900000).toString();
         setSyncPin(pin);
-        localStorage.setItem('planificador_sync_pin', pin);
+        safeStorage.setItem('planificador_sync_pin', pin);
       };
 
       const handleSavePinToCloud = async () => {
@@ -7230,7 +7303,7 @@
         }
         setIsSyncing(true);
         setSyncStatus('⏳ Subiendo y sincronizando todos tus datos en la Nube...');
-        localStorage.setItem('planificador_sync_pin', cleanPin);
+        safeStorage.setItem('planificador_sync_pin', cleanPin);
 
         try {
           await autoPushToCloud(cleanPin, data);
