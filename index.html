@@ -862,6 +862,22 @@
       return cleaned;
     }
 
+    function sanitizeMasterData(raw) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return INITIAL_DATA;
+      return {
+        ...raw,
+        calendarEvents: sanitizeCalendarEvents(Array.isArray(raw.calendarEvents) ? raw.calendarEvents : INITIAL_DATA.calendarEvents),
+        weeklyPlans: Array.isArray(raw.weeklyPlans) ? raw.weeklyPlans.filter(w => w && typeof w === 'object') : [],
+        notes: Array.isArray(raw.notes) ? raw.notes.filter(n => n && typeof n === 'object') : INITIAL_DATA.notes,
+        teacherSchedule: (Array.isArray(raw.teacherSchedule) && raw.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(raw.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
+        ccpMeetings: Array.isArray(raw.ccpMeetings) ? raw.ccpMeetings.filter(m => m && typeof m === 'object') : INITIAL_DATA.ccpMeetings,
+        claustroMeetings: Array.isArray(raw.claustroMeetings) ? raw.claustroMeetings.filter(m => m && typeof m === 'object') : INITIAL_DATA.claustroMeetings,
+        temporalizations: Array.isArray(raw.temporalizations) ? raw.temporalizations.filter(t => t && typeof t === 'object') : INITIAL_DATA.temporalizations,
+        groups: (Array.isArray(raw.groups) && raw.groups.length > 0) ? sanitizeGroups(raw.groups) : INITIAL_GROUPS,
+        monthlyEvents: sanitizeMonthlyEvents(raw.monthlyEvents)
+      };
+    }
+
     function sanitizeGroups(groupsList) {
       if (!Array.isArray(groupsList) || groupsList.length === 0) return INITIAL_GROUPS;
       return groupsList.filter(g => g && typeof g === 'object').map(g => {
@@ -1760,8 +1776,9 @@
         } catch(e) {}
 
         if (remoteTime > localTime + 500) {
-          try { localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(remoteData)); } catch(e) {}
-          onNewData(remoteData);
+          const cleanRemote = sanitizeMasterData(remoteData);
+          try { safeStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(cleanRemote)); } catch(e) {}
+          onNewData(cleanRemote);
           return true;
         }
       } catch(e) {
@@ -1787,25 +1804,15 @@
 
       const [data, setData] = useState(() => {
         try {
-          const saved = localStorage.getItem('planificador_docente_nuria_rt_2026_2027');
+          const saved = safeStorage.getItem('planificador_docente_nuria_rt_2026_2027');
           if (saved) {
             const parsed = JSON.parse(saved);
             if (parsed && typeof parsed === 'object') {
-              return {
-                calendarEvents: sanitizeCalendarEvents(Array.isArray(parsed.calendarEvents) ? parsed.calendarEvents : INITIAL_DATA.calendarEvents),
-                weeklyPlans: Array.isArray(parsed.weeklyPlans) ? parsed.weeklyPlans.filter(w => w && w.id !== 'w1') : [],
-                notes: Array.isArray(parsed.notes) ? parsed.notes : INITIAL_DATA.notes,
-                teacherSchedule: (Array.isArray(parsed.teacherSchedule) && parsed.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(parsed.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
-                ccpMeetings: Array.isArray(parsed.ccpMeetings) ? parsed.ccpMeetings : INITIAL_DATA.ccpMeetings,
-                claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
-                temporalizations: Array.isArray(parsed.temporalizations) ? parsed.temporalizations : INITIAL_DATA.temporalizations,
-                groups: (Array.isArray(parsed.groups) && parsed.groups.length > 0) ? sanitizeGroups(parsed.groups) : INITIAL_GROUPS,
-                monthlyEvents: sanitizeMonthlyEvents(parsed.monthlyEvents)
-              };
+              return sanitizeMasterData(parsed);
             }
           }
         } catch (e) {
-          console.error("Error al cargar localStorage:", e);
+          console.error("Error al cargar memoria local:", e);
         }
         return INITIAL_DATA;
       });
@@ -1819,7 +1826,7 @@
 
         const payload = { ...data, _lastUpdated: Date.now() };
         try {
-          localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(payload));
+          safeStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(payload));
         } catch (e) {}
 
         let pin = safeStorage.getItem('planificador_sync_pin');
@@ -1843,13 +1850,7 @@
           const pin = safeStorage.getItem('planificador_sync_pin') || "584920";
           autoFetchFromCloud(pin, (newData) => {
             if (newData && typeof newData === 'object') {
-              setData(prev => ({
-                ...newData,
-                calendarEvents: sanitizeCalendarEvents(Array.isArray(newData.calendarEvents) ? newData.calendarEvents : INITIAL_DATA.calendarEvents),
-                teacherSchedule: (Array.isArray(newData.teacherSchedule) && newData.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(newData.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
-                groups: (Array.isArray(newData.groups) && newData.groups.length > 0) ? sanitizeGroups(newData.groups) : INITIAL_GROUPS,
-                monthlyEvents: sanitizeMonthlyEvents(newData.monthlyEvents || prev?.monthlyEvents)
-              }));
+              setData(prev => sanitizeMasterData({ ...prev, ...newData }));
               setAutoSyncStatus('🟢 Actualizado automáticamente');
             }
           });
@@ -7559,35 +7560,34 @@
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props);
-        this.state = { hasError: false };
+        this.state = { hasError: false, errorDetails: null };
       }
-      static getDerivedStateFromError() {
-        return { hasError: true };
+      static getDerivedStateFromError(error) {
+        return { hasError: true, errorDetails: error ? error.toString() : '' };
       }
       componentDidCatch(error, errorInfo) {
         console.error("Error capturado por ErrorBoundary:", error, errorInfo);
+        try {
+          safeStorage.removeItem('planificador_docente_nuria_rt_2026_2027');
+        } catch (e) {}
       }
       render() {
         if (this.state.hasError) {
-          return h('div', { style: { padding: '3rem 1.5rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif' } },
-            h('h2', { style: { color: '#7A2638', fontSize: '1.8rem', marginBottom: '1rem' } }, '✨ Planificador Docente Nuria RT'),
-            h('p', { style: { color: '#4A5568', fontSize: '1.05rem', marginBottom: '1.5rem' } }, 'Se ha actualizado la estructura del planificador. Haz clic abajo para cargar la vista:'),
+          return h('div', { style: { padding: '3rem 1.5rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif', maxWidth: '640px', margin: '2rem auto', background: '#FFFFFF', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' } },
+            h('h2', { style: { color: '#7A2638', fontSize: '1.6rem', marginBottom: '0.75rem' } }, '✨ Planificador Docente Nuria RT'),
+            h('p', { style: { color: '#4A5568', fontSize: '0.95rem', marginBottom: '1.25rem', lineHeight: 1.5 } }, 'Haz clic abajo para iniciar el planificador con la configuración limpia en este dispositivo:'),
             h('div', { style: { display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' } },
               h('button', {
-                style: { padding: '0.75rem 1.5rem', background: '#1E2E40', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
+                style: { padding: '0.75rem 1.75rem', background: '#1E2E40', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
                 onClick: () => {
                   try {
                     safeStorage.removeItem('planificador_docente_nuria_rt_2026_2027');
+                    memoryStorage['planificador_docente_nuria_rt_2026_2027'] = null;
                   } catch (e) {}
+                  this.setState({ hasError: false });
                   window.location.reload();
                 }
-              }, '🔄 Cargar Planificador'),
-              h('button', {
-                style: { padding: '0.75rem 1.5rem', background: '#C49A45', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
-                onClick: () => {
-                  this.setState({ hasError: false });
-                }
-              }, '⚡ Reintentar Vista')
+              }, '🔄 Cargar Planificador Ahora')
             )
           );
         }
@@ -7595,34 +7595,47 @@
       }
     }
 
-    // Render app cleanly with ErrorBoundary protection
-    if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
-      document.getElementById('root').innerHTML = `
-        <div style="padding: 3rem 1.5rem; text-align: center; font-family: system-ui, sans-serif;">
-          <h2 style="color: #7A2638; font-size: 1.6rem; margin-bottom: 1rem;">⚠️ Error de conexión CDN</h2>
-          <p style="color: #4A5568; font-size: 1rem; margin-bottom: 1.5rem;">No se ha podido cargar la librería React desde la red. Por favor, comprueba tu conexión a internet y recarga la página.</p>
-          <button style="padding: 0.75rem 1.5rem; background: #1E2E40; color: #FFF; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;" onclick="window.location.reload()">🔄 Reintentar Carga</button>
-        </div>
-      `;
-    } else {
-      const rootEl = document.getElementById('root');
-      try {
-        if (ReactDOM.createRoot) {
-          ReactDOM.createRoot(rootEl).render(h(ErrorBoundary, null, h(App)));
+    // Auto-mounting with retry loop for maximum cross-device compatibility
+    function initPlannerApp() {
+      let attempts = 0;
+      const mount = () => {
+        attempts++;
+        if (typeof React !== 'undefined' && typeof ReactDOM !== 'undefined') {
+          const rootEl = document.getElementById('root');
+          if (!rootEl) return;
+          try {
+            if (ReactDOM.createRoot) {
+              ReactDOM.createRoot(rootEl).render(h(ErrorBoundary, null, h(App)));
+            } else {
+              ReactDOM.render(h(ErrorBoundary, null, h(App)), rootEl);
+            }
+          } catch (err) {
+            console.error('Mount exception:', err);
+          }
+        } else if (attempts < 60) {
+          setTimeout(mount, 100);
         } else {
-          ReactDOM.render(h(ErrorBoundary, null, h(App)), rootEl);
+          const rootEl = document.getElementById('root');
+          if (rootEl) {
+            rootEl.innerHTML = `
+              <div style="padding: 3rem 1.5rem; text-align: center; font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; background: #FFFFFF; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                <h2 style="color: #7A2638; font-size: 1.6rem; margin-bottom: 0.75rem;">✨ Planificador Docente Nuria RT</h2>
+                <p style="color: #4A5568; font-size: 0.95rem; margin-bottom: 1.25rem;">Cargando interfaz...</p>
+                <button style="padding: 0.75rem 1.75rem; background: #1E2E40; color: #FFF; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; font-weight: bold;" onclick="window.location.reload()">🔄 Cargar Planificador</button>
+              </div>
+            `;
+          }
         }
-      } catch (err) {
-        console.error('Mount error:', err);
-        rootEl.innerHTML = `
-          <div style="padding: 3rem 1.5rem; text-align: center; font-family: system-ui, sans-serif;">
-            <h2 style="color: #7A2638; font-size: 1.6rem; margin-bottom: 1rem;">✨ Planificador Docente Nuria RT</h2>
-            <p style="color: #4A5568; font-size: 1rem; margin-bottom: 1.5rem;">Se requiere restablecer la memoria local para cargar la vista de forma limpia.</p>
-            <button style="padding: 0.75rem 1.5rem; background: #1E2E40; color: #FFF; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;" onclick="localStorage.clear(); window.location.reload();">🔄 Cargar Planificador</button>
-          </div>
-        `;
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mount);
+      } else {
+        mount();
       }
     }
+
+    initPlannerApp();
   </script>
 </body>
 </html>
