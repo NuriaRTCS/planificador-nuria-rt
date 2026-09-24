@@ -850,6 +850,18 @@
       }
     ];
 
+    function sanitizeMonthlyEvents(rawMonthly) {
+      if (!rawMonthly || typeof rawMonthly !== 'object' || Array.isArray(rawMonthly)) return {};
+      const cleaned = {};
+      Object.keys(rawMonthly).forEach(dateKey => {
+        const val = rawMonthly[dateKey];
+        if (Array.isArray(val)) {
+          cleaned[dateKey] = val.filter(evt => evt && typeof evt === 'object');
+        }
+      });
+      return cleaned;
+    }
+
     function sanitizeGroups(groupsList) {
       if (!Array.isArray(groupsList) || groupsList.length === 0) return INITIAL_GROUPS;
       return groupsList.filter(g => g && typeof g === 'object').map(g => {
@@ -1788,7 +1800,7 @@
                 claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
                 temporalizations: Array.isArray(parsed.temporalizations) ? parsed.temporalizations : INITIAL_DATA.temporalizations,
                 groups: (Array.isArray(parsed.groups) && parsed.groups.length > 0) ? sanitizeGroups(parsed.groups) : INITIAL_GROUPS,
-                monthlyEvents: (parsed.monthlyEvents && typeof parsed.monthlyEvents === 'object' && !Array.isArray(parsed.monthlyEvents)) ? parsed.monthlyEvents : {}
+                monthlyEvents: sanitizeMonthlyEvents(parsed.monthlyEvents)
               };
             }
           }
@@ -1836,7 +1848,7 @@
                 calendarEvents: sanitizeCalendarEvents(Array.isArray(newData.calendarEvents) ? newData.calendarEvents : INITIAL_DATA.calendarEvents),
                 teacherSchedule: (Array.isArray(newData.teacherSchedule) && newData.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(newData.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
                 groups: (Array.isArray(newData.groups) && newData.groups.length > 0) ? sanitizeGroups(newData.groups) : INITIAL_GROUPS,
-                monthlyEvents: (newData.monthlyEvents && typeof newData.monthlyEvents === 'object' && !Array.isArray(newData.monthlyEvents)) ? newData.monthlyEvents : (prev?.monthlyEvents || {})
+                monthlyEvents: sanitizeMonthlyEvents(newData.monthlyEvents || prev?.monthlyEvents)
               }));
               setAutoSyncStatus('🟢 Actualizado automáticamente');
             }
@@ -1866,29 +1878,38 @@
       const dailyQuote = getDailyQuote();
 
       const renderView = () => {
-        switch (currentSection) {
-          case 'home':
-            return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
-          case 'teacherSchedule':
-            return h(TeacherScheduleView, { schedule: data.teacherSchedule || INITIAL_TEACHER_SCHEDULE, setSchedule: s => setData({...data, teacherSchedule: s}) });
-          case 'calendar':
-            return h(CalendarView, { events: data.calendarEvents || [], setEvents: evts => setData({...data, calendarEvents: evts}), onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
-          case 'weekly':
-            return h(WeeklyPlanner, { plans: data.weeklyPlans || [], setPlans: p => setData({...data, weeklyPlans: p}), calendarEvents: data.calendarEvents || [], teacherSchedule: data.teacherSchedule || INITIAL_TEACHER_SCHEDULE, targetDate: targetWeeklyDate });
-          case 'groups':
-            return h(GroupsView, { groups: data.groups || INITIAL_GROUPS, setGroups: g => setData({...data, groups: g}) });
-          case 'notes':
-            return h(NotesView, { notes: data.notes || [], setNotes: n => setData({...data, notes: n}) });
-          case 'ccp':
-            return h(CCPView, { meetings: data.ccpMeetings || [], setMeetings: m => setData({...data, ccpMeetings: m}) });
-          case 'claustro':
-            return h(ClaustroView, { meetings: data.claustroMeetings || [], setMeetings: m => setData({...data, claustroMeetings: m}) });
-          case 'monthly':
-            return h(MonthlyPlanningView, { data, setData });
-          case 'temporalizaciones':
-            return h(TemporalizationsView, { items: data.temporalizations || [], setItems: items => setData({...data, temporalizations: items}) });
-          default:
-            return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
+        try {
+          switch (currentSection) {
+            case 'home':
+              return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
+            case 'teacherSchedule':
+              return h(TeacherScheduleView, { schedule: data.teacherSchedule || INITIAL_TEACHER_SCHEDULE, setSchedule: s => setData({...data, teacherSchedule: s}) });
+            case 'calendar':
+              return h(CalendarView, { events: data.calendarEvents || [], setEvents: evts => setData({...data, calendarEvents: evts}), onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
+            case 'weekly':
+              return h(WeeklyPlanner, { plans: data.weeklyPlans || [], setPlans: p => setData({...data, weeklyPlans: p}), calendarEvents: data.calendarEvents || [], teacherSchedule: data.teacherSchedule || INITIAL_TEACHER_SCHEDULE, targetDate: targetWeeklyDate });
+            case 'groups':
+              return h(GroupsView, { groups: data.groups || INITIAL_GROUPS, setGroups: g => setData({...data, groups: g}) });
+            case 'notes':
+              return h(NotesView, { notes: data.notes || [], setNotes: n => setData({...data, notes: n}) });
+            case 'ccp':
+              return h(CCPView, { meetings: data.ccpMeetings || [], setMeetings: m => setData({...data, ccpMeetings: m}) });
+            case 'claustro':
+              return h(ClaustroView, { meetings: data.claustroMeetings || [], setMeetings: m => setData({...data, claustroMeetings: m}) });
+            case 'monthly':
+              return h(MonthlyPlanningView, { data, setData });
+            case 'temporalizaciones':
+              return h(TemporalizationsView, { items: data.temporalizations || [], setItems: items => setData({...data, temporalizations: items}) });
+            default:
+              return h(HomeView, { setCurrentSection, data, setData, onGoToWeeklyPlanner: handleGoToWeeklyPlanner });
+          }
+        } catch (err) {
+          console.error("View error:", err);
+          return h('div', { style: { padding: '2rem', textAlign: 'center', background: '#FFFFFF', borderRadius: '8px', border: '1px solid var(--border-color)', margin: '1rem 0' } },
+            h('h3', { style: { color: 'var(--burgundy)', marginBottom: '0.5rem' } }, '⚠️ Sección en actualización'),
+            h('p', { style: { color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' } }, 'Pulsa el botón para cargar la información limpia:'),
+            h('button', { className: 'btn btn-primary', onClick: () => { safeStorage.removeItem('planificador_docente_nuria_rt_2026_2027'); setData(INITIAL_DATA); } }, '🔄 Cargar Sección Limpia')
+          );
         }
       };
 
@@ -2250,7 +2271,8 @@
                 const isToday = (dateStr === todayStr);
 
                 const calEvt = (data.calendarEvents || []).find(e => e.date === dateStr);
-                const dayEvents = (data.monthlyEvents && data.monthlyEvents[dateStr]) || [];
+                const rawMonthlyList = data.monthlyEvents && data.monthlyEvents[dateStr];
+                const dayEvents = Array.isArray(rawMonthlyList) ? rawMonthlyList : [];
 
                 homeMonthCells.push({
                   isBlank: false,
@@ -6987,7 +7009,8 @@
         const isToday = (dateStr === todayStr);
 
         const calEvt = (data.calendarEvents || []).find(e => e.date === dateStr);
-        const dayEvents = (data.monthlyEvents && data.monthlyEvents[dateStr]) || [];
+        const rawMonthlyList = data.monthlyEvents && data.monthlyEvents[dateStr];
+        const dayEvents = Array.isArray(rawMonthlyList) ? rawMonthlyList : [];
 
         dayCells.push({
           isBlank: false,
@@ -7549,13 +7572,23 @@
           return h('div', { style: { padding: '3rem 1.5rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif' } },
             h('h2', { style: { color: '#7A2638', fontSize: '1.8rem', marginBottom: '1rem' } }, '✨ Planificador Docente Nuria RT'),
             h('p', { style: { color: '#4A5568', fontSize: '1.05rem', marginBottom: '1.5rem' } }, 'Se ha actualizado la estructura del planificador. Haz clic abajo para cargar la vista:'),
-            h('button', {
-              style: { padding: '0.75rem 1.5rem', background: '#1E2E40', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
-              onClick: () => {
-                localStorage.removeItem('planificador_docente_nuria_rt_2026_2027');
-                window.location.reload();
-              }
-            }, '🔄 Cargar Planificador')
+            h('div', { style: { display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' } },
+              h('button', {
+                style: { padding: '0.75rem 1.5rem', background: '#1E2E40', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
+                onClick: () => {
+                  try {
+                    safeStorage.removeItem('planificador_docente_nuria_rt_2026_2027');
+                  } catch (e) {}
+                  window.location.reload();
+                }
+              }, '🔄 Cargar Planificador'),
+              h('button', {
+                style: { padding: '0.75rem 1.5rem', background: '#C49A45', color: '#FFF', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' },
+                onClick: () => {
+                  this.setState({ hasError: false });
+                }
+              }, '⚡ Reintentar Vista')
+            )
           );
         }
         return this.props.children;
