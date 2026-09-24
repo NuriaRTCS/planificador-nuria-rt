@@ -6673,6 +6673,28 @@
       return 'Evento Escolar';
     }
 
+    function getMonthlyTagBadgeClass(tag) {
+      if (tag === 'examen') return 'lesson-badge examen';
+      if (tag === 'tarea_evaluable' || tag === 'entrega') return 'lesson-badge actividades';
+      if (tag === 'evaluacion') return 'lesson-badge explicacion';
+      if (tag === 'actividad') return 'lesson-badge correccion';
+      if (tag === 'reunion') return 'lesson-badge tesa';
+      if (tag === 'salida') return 'lesson-badge claustro';
+      if (tag === 'importante') return 'lesson-badge correccion';
+      return '';
+    }
+
+    function getMonthlyTagLabel(tag) {
+      if (tag === 'examen') return 'EXAMEN';
+      if (tag === 'tarea_evaluable' || tag === 'entrega') return 'TAREA EVALUABLE';
+      if (tag === 'evaluacion') return 'EVALUACIÓN';
+      if (tag === 'actividad') return 'ACTIVIDAD';
+      if (tag === 'reunion') return 'REUNIÓN';
+      if (tag === 'salida') return 'SALIDA';
+      if (tag === 'importante') return '⭐ IMPORTANTE';
+      return '';
+    }
+
     // --- MONTHLY DAY EVENTS MODAL ---
     function DayMonthlyEventsModal({ dateStr, events = [], calendarEvents = [], onSave, onClose }) {
       const [localEvents, setLocalEvents] = useState(() => {
@@ -7096,28 +7118,6 @@
         } catch (e) {
           console.error("Error al guardar eventos mensuales:", e);
         }
-      };
-
-      const getMonthlyTagBadgeClass = (tag) => {
-        if (tag === 'examen') return 'lesson-badge examen';
-        if (tag === 'tarea_evaluable' || tag === 'entrega') return 'lesson-badge actividades';
-        if (tag === 'evaluacion') return 'lesson-badge explicacion';
-        if (tag === 'actividad') return 'lesson-badge correccion';
-        if (tag === 'reunion') return 'lesson-badge tesa';
-        if (tag === 'salida') return 'lesson-badge claustro';
-        if (tag === 'importante') return 'lesson-badge correccion';
-        return '';
-      };
-
-      const getMonthlyTagLabel = (tag) => {
-        if (tag === 'examen') return 'EXAMEN';
-        if (tag === 'tarea_evaluable' || tag === 'entrega') return 'TAREA EVALUABLE';
-        if (tag === 'evaluacion') return 'EVALUACIÓN';
-        if (tag === 'actividad') return 'ACTIVIDAD';
-        if (tag === 'reunion') return 'REUNIÓN';
-        if (tag === 'salida') return 'SALIDA';
-        if (tag === 'importante') return '⭐ IMPORTANTE';
-        return '';
       };
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
