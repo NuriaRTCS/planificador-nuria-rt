@@ -253,7 +253,11 @@
       flex-wrap: wrap;
     }
 
-    .quote-box { max-width: 700px; }
+    .quote-box {
+      flex: 1;
+      width: 100%;
+      max-width: none;
+    }
 
     .quote-text {
       font-family: var(--font-literary);
@@ -1487,7 +1491,8 @@
           createdAt: '2026-09-01'
         }
       ],
-      groups: INITIAL_GROUPS
+      groups: INITIAL_GROUPS,
+      monthlyEvents: {}
     };
 
     const LITERARY_QUOTES = [
@@ -1756,7 +1761,8 @@
                 ccpMeetings: Array.isArray(parsed.ccpMeetings) ? parsed.ccpMeetings : INITIAL_DATA.ccpMeetings,
                 claustroMeetings: Array.isArray(parsed.claustroMeetings) ? parsed.claustroMeetings : INITIAL_DATA.claustroMeetings,
                 temporalizations: Array.isArray(parsed.temporalizations) ? parsed.temporalizations : INITIAL_DATA.temporalizations,
-                groups: (Array.isArray(parsed.groups) && parsed.groups.length > 0) ? sanitizeGroups(parsed.groups) : INITIAL_GROUPS
+                groups: (Array.isArray(parsed.groups) && parsed.groups.length > 0) ? sanitizeGroups(parsed.groups) : INITIAL_GROUPS,
+                monthlyEvents: (parsed.monthlyEvents && typeof parsed.monthlyEvents === 'object' && !Array.isArray(parsed.monthlyEvents)) ? parsed.monthlyEvents : {}
               };
             }
           }
@@ -1799,12 +1805,13 @@
           const pin = localStorage.getItem('planificador_sync_pin') || "584920";
           autoFetchFromCloud(pin, (newData) => {
             if (newData && typeof newData === 'object') {
-              setData({
+              setData(prev => ({
                 ...newData,
                 calendarEvents: sanitizeCalendarEvents(Array.isArray(newData.calendarEvents) ? newData.calendarEvents : INITIAL_DATA.calendarEvents),
                 teacherSchedule: (Array.isArray(newData.teacherSchedule) && newData.teacherSchedule.length > 0) ? sanitizeTeacherSchedule(newData.teacherSchedule) : INITIAL_TEACHER_SCHEDULE,
-                groups: (Array.isArray(newData.groups) && newData.groups.length > 0) ? sanitizeGroups(newData.groups) : INITIAL_GROUPS
-              });
+                groups: (Array.isArray(newData.groups) && newData.groups.length > 0) ? sanitizeGroups(newData.groups) : INITIAL_GROUPS,
+                monthlyEvents: (newData.monthlyEvents && typeof newData.monthlyEvents === 'object' && !Array.isArray(newData.monthlyEvents)) ? newData.monthlyEvents : (prev?.monthlyEvents || {})
+              }));
               setAutoSyncStatus('🟢 Actualizado automáticamente');
             }
           });
@@ -1850,6 +1857,8 @@
             return h(CCPView, { meetings: data.ccpMeetings || [], setMeetings: m => setData({...data, ccpMeetings: m}) });
           case 'claustro':
             return h(ClaustroView, { meetings: data.claustroMeetings || [], setMeetings: m => setData({...data, claustroMeetings: m}) });
+          case 'monthly':
+            return h(MonthlyPlanningView, { data, setData });
           case 'temporalizaciones':
             return h(TemporalizationsView, { items: data.temporalizations || [], setItems: items => setData({...data, temporalizations: items}) });
           default:
@@ -1861,7 +1870,8 @@
         { id: 'home', label: 'Inicio', icon: '🏠' },
         { id: 'teacherSchedule', label: 'Horario Docente', icon: '🕒', badge: 'Oficial' },
         { id: 'calendar', label: 'Calendario 2026/2027', icon: '📅', badge: '2026-27' },
-        { id: 'weekly', label: 'Planificador Semanal', icon: '🗓️', badge: 'Aula' },
+        { id: 'monthly', label: 'Planificación Mensual', icon: '🗓️', badge: 'Mes' },
+        { id: 'weekly', label: 'Planificador Semanal', icon: '⏰', badge: 'Aula' },
         { id: 'groups', label: 'Grupos', icon: '🏫', badge: (data.groups || INITIAL_GROUPS).length },
         { id: 'notes', label: 'Notas Docentes', icon: '📝', badge: (data.notes || []).length },
         { id: 'ccp', label: 'Reuniones CCP', icon: '👥', badge: (data.ccpMeetings || []).length },
@@ -1873,7 +1883,6 @@
         isMobileNavOpen && h('div', { className: 'sidebar-overlay', onClick: () => setIsMobileNavOpen(false) }),
         h('aside', { className: `sidebar ${isMobileNavOpen ? 'open' : ''}` },
           h('div', { className: 'sidebar-header' },
-            h('div', { className: 'brand-badge' }, '✨ EDICIÓN LITERARIA'),
             h('h1', { className: 'sidebar-title' }, 'Nuria RT 2026/2027'),
             h('p', { className: 'sidebar-subtitle' }, '«Docendo discimus» — Enseñando aprendemos')
           ),
@@ -1907,8 +1916,7 @@
               h('div', { className: 'header-content' },
                 h('div', { className: 'quote-box' },
                   h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.2rem' } },
-                    h('button', { className: 'mobile-nav-toggle', onClick: () => setIsMobileNavOpen(!isMobileNavOpen) }, '☰ Menú'),
-                    h('span', { className: 'badge badge-gold' }, '🖋️ Cita Literaria del Día')
+                    h('button', { className: 'mobile-nav-toggle', onClick: () => setIsMobileNavOpen(!isMobileNavOpen) }, '☰ Menú')
                   ),
                   h('p', { className: 'quote-text' }, `«${dailyQuote.quote}»`),
                   h('div', { className: 'quote-author' }, `— ${dailyQuote.author}`)
@@ -1971,6 +1979,14 @@
       const todayDayInfo = activeWeek.days?.[currentDayKey] || {};
       const todaySlots = todayDayInfo.slots || {};
       const todaySlotKeys = Object.keys(todaySlots);
+
+      const schoolMonths = getReorderedSchoolMonths();
+      const [homeMonthIndex, setHomeMonthIndex] = useState(() => {
+        const currentMonthNum = today.getMonth() + 1;
+        const currentYear = today.getFullYear();
+        const foundIdx = schoolMonths.findIndex(m => m.year === currentYear && m.monthNum === currentMonthNum);
+        return foundIdx >= 0 ? foundIdx : 0;
+      });
 
       const [calMonth, setCalMonth] = useState(today.getMonth());
       const [calYear, setCalYear] = useState(today.getFullYear());
@@ -2142,29 +2158,12 @@
                 h('span', { style: { color: 'var(--text-muted)' } }, `${todaySlotKeys.length} franjas ocupadas`),
                 h('button', { onClick: () => setCurrentSection('weekly'), style: { background: 'none', border: 'none', color: 'var(--gold-accent)', fontWeight: 600, cursor: 'pointer' } }, 'Ver semana →')
               )
-            ),
-
-            /* CARD 4: PRÓXIMAMENTE */
-            h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' } },
-                h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)' } }, '📣 Próximamente'),
-                h('button', { className: 'btn btn-secondary', style: { padding: '0.2rem 0.55rem', fontSize: '0.725rem' }, onClick: () => setCurrentSection('calendar') }, 'Ver todos')
-              ),
-              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.5rem' } },
-                upcomingEvents.map(evt => h('div', { key: evt.id, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.45rem 0.65rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-                  h('div', null,
-                    h('div', { style: { fontWeight: 600, fontSize: '0.825rem', color: 'var(--ink-blue)' } }, `${evt.title || 'Evento'} ${evt.time ? `(${evt.time})` : ''}`),
-                    evt.details && h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }, evt.details)
-                  ),
-                  h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, formatDateDDMMYYYY(evt.date))
-                ))
-              )
             )
           ),
 
-          /* COLUMN 2 (RIGHT): CUENTA ATRÁS LECTIVA (COMPACTA) + MINI CALENDARIO */
+          /* COLUMN 2 (RIGHT): CUENTA ATRÁS LECTIVA + MES EN CURSO DE LA PLANIFICACIÓN MENSUAL */
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-            /* CARD 2: CUENTA ATRÁS LECTIVA (COMPACTA Y AJUSTADA AL TEXTO) */
+            /* CARD 2: CUENTA ATRÁS LECTIVA */
             h('div', { className: 'card', style: { borderLeft: '4px solid var(--burgundy)', padding: '0.85rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, var(--burgundy-light) 100%)', height: 'fit-content' } },
               h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' } },
                 h('span', { className: 'badge badge-burgundy', style: { fontSize: '0.7rem' } }, '⏳ CUENTA ATRÁS LECTIVA'),
@@ -2197,46 +2196,214 @@
               )
             ),
 
-            /* CARD 3: MINI CALENDARIO */
-            h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
-                h('h3', { style: { fontSize: '1.05rem', color: 'var(--ink-blue)', textTransform: 'capitalize' } }, `📅 ${monthName}`),
-                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                  h('button', { onClick: () => { setCalMonth(today.getMonth()); setCalYear(today.getFullYear()); }, className: 'btn btn-gold', style: { padding: '0.15rem 0.5rem', fontSize: '0.725rem' } }, 'Hoy'),
-                  h('button', { onClick: () => { if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); } else setCalMonth(calMonth - 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '◄'),
-                  h('button', { onClick: () => { if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); } else setCalMonth(calMonth + 1); }, className: 'btn btn-secondary', style: { padding: '0.15rem 0.45rem', fontSize: '0.75rem' } }, '►')
+            /* CARD 3: PLANIFICACIÓN MENSUAL CON NAVEGACIÓN DE MESES */
+            (() => {
+              const allSchoolMonths = getReorderedSchoolMonths();
+              const safeMonthIdx = Math.max(0, Math.min(allSchoolMonths.length - 1, homeMonthIndex));
+              const currentMonthObj = allSchoolMonths[safeMonthIdx] || allSchoolMonths[0];
+              const { year: mYear, monthNum: mNum, name: mTitle } = currentMonthObj;
+
+              const isCurrentCalendarMonth = (mYear === today.getFullYear() && mNum === (today.getMonth() + 1));
+
+              const firstDayObj = new Date(mYear, mNum - 1, 1);
+              const daysInM = new Date(mYear, mNum, 0).getDate();
+              const firstDayOfWeek = firstDayObj.getDay();
+              const startOffset = (firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1);
+              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+              const homeMonthCells = [];
+              for (let i = 0; i < startOffset; i++) {
+                homeMonthCells.push({ isBlank: true, id: `blank_${i}` });
+              }
+
+              for (let d = 1; d <= daysInM; d++) {
+                const dateStr = `${mYear}-${String(mNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dObj = new Date(mYear, mNum - 1, d);
+                const dayOfWeek = dObj.getDay();
+                const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+                const isToday = (dateStr === todayStr);
+
+                const calEvt = (data.calendarEvents || []).find(e => e.date === dateStr);
+                const dayEvents = (data.monthlyEvents && data.monthlyEvents[dateStr]) || [];
+
+                homeMonthCells.push({
+                  isBlank: false,
+                  dayNum: d,
+                  dateStr,
+                  isWeekend,
+                  isToday,
+                  calEvt,
+                  dayEvents
+                });
+              }
+
+              return h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem', flexWrap: 'wrap' } },
+                  h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
+                    h('span', { className: 'badge badge-gold', style: { fontSize: '0.65rem', display: 'inline-block', width: 'fit-content' } },
+                      isCurrentCalendarMonth ? '🗓️ MES EN CURSO' : '🗓️ PLANIFICACIÓN MENSUAL'
+                    ),
+                    h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.4rem' } },
+                      h('button', {
+                        type: 'button',
+                        className: 'btn btn-secondary',
+                        style: { padding: '0.15rem 0.5rem', fontSize: '0.85rem', lineHeight: 1, borderRadius: '4px', cursor: safeMonthIdx === 0 ? 'not-allowed' : 'pointer', opacity: safeMonthIdx === 0 ? 0.4 : 1 },
+                        disabled: safeMonthIdx === 0,
+                        onClick: () => setHomeMonthIndex(prev => Math.max(0, prev - 1)),
+                        title: 'Mes anterior'
+                      }, '◀'),
+                      h('h3', { style: { fontSize: '1.1rem', color: 'var(--ink-blue)', textTransform: 'capitalize', margin: 0, fontWeight: 700 } }, `📅 ${mTitle}`),
+                      h('button', {
+                        type: 'button',
+                        className: 'btn btn-secondary',
+                        style: { padding: '0.15rem 0.5rem', fontSize: '0.85rem', lineHeight: 1, borderRadius: '4px', cursor: safeMonthIdx === allSchoolMonths.length - 1 ? 'not-allowed' : 'pointer', opacity: safeMonthIdx === allSchoolMonths.length - 1 ? 0.4 : 1 },
+                        disabled: safeMonthIdx === allSchoolMonths.length - 1,
+                        onClick: () => setHomeMonthIndex(prev => Math.min(allSchoolMonths.length - 1, prev + 1)),
+                        title: 'Mes siguiente'
+                      }, '▶')
+                    )
+                  ),
+                  h('button', {
+                    type: 'button',
+                    className: 'btn btn-secondary',
+                    style: { padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 600 },
+                    onClick: () => setCurrentSection('monthly')
+                  }, 'Ver mes completo →')
+                ),
+
+                /* MONTH GRID FOR CURRENT MONTH (WEEKDAYS 1fr, WEEKENDS 0.5fr) */
+                h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 0.5fr 0.5fr', gap: '0.3rem' } },
+                  /* HEADERS */
+                  h('div', { className: 'month-day-header', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Lu'),
+                  h('div', { className: 'month-day-header', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Ma'),
+                  h('div', { className: 'month-day-header', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Mi'),
+                  h('div', { className: 'month-day-header', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Ju'),
+                  h('div', { className: 'month-day-header', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Vi'),
+                  h('div', { className: 'month-day-header weekend', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Sáb'),
+                  h('div', { className: 'month-day-header weekend', style: { fontSize: '0.7rem', padding: '0.2rem' } }, 'Dom'),
+
+                  /* CELLS */
+                  homeMonthCells.map((cell, idx) => {
+                    if (cell.isBlank) {
+                      return h('div', { key: cell.id || idx, className: 'month-day-cell other-month', style: { minHeight: '65px', background: 'none', border: 'none' } });
+                    }
+
+                    const { dayNum, dateStr, isWeekend, isToday, calEvt, dayEvents } = cell;
+                    const calTagClass = calEvt?.tag ? `tag-${calEvt.tag}` : (isWeekend ? 'weekend-default' : '');
+
+                    return h('div', {
+                      key: dateStr,
+                      className: `month-day-cell ${isToday ? 'today' : ''} ${calTagClass}`,
+                      onClick: () => setSelectedDateForNotes(dateStr),
+                      style: {
+                        minHeight: '75px',
+                        padding: isWeekend ? '0.25rem 0.15rem' : '0.3rem 0.25rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        alignItems: 'stretch',
+                        cursor: 'pointer',
+                        border: isToday ? '2px solid var(--gold-accent)' : (isWeekend ? '1px solid #FECACA' : '1px solid var(--border-color)'),
+                        background: isToday ? '#FFFDF0' : (isWeekend ? '#FEF2F2' : '#FFFFFF'),
+                        transition: 'all 0.15s ease'
+                      }
+                    },
+                      /* CELL HEADER */
+                      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                        h('span', { style: { fontWeight: isToday ? 800 : 700, fontSize: '0.8rem', color: isToday ? 'var(--burgundy)' : (isWeekend ? '#DC2626' : 'var(--ink-blue)') } }, dayNum)
+                      ),
+
+                      /* CONTENT (CALENDAR READ-ONLY + MONTHLY EVENTS) */
+                      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.15rem', overflow: 'hidden', maxHeight: '50px' } },
+                        calEvt && (() => {
+                          const tag = calEvt.tag || calEvt.type || '';
+                          const tagReadable = getCalTagReadableName(tag);
+                          const eventLabel = calEvt.title ? calEvt.title.trim() : tagReadable;
+                          const displayText = `📌 ${eventLabel}`;
+
+                          let bg = '#E2E8F0';
+                          let color = '#334155';
+                          if (tag === 'festivo') { bg = '#EF4444'; color = '#FFFFFF'; }
+                          else if (tag === 'no_lectivo' || tag === 'vacaciones') { bg = '#F87171'; color = '#FFFFFF'; }
+                          else if (tag === 'evaluacion') { bg = '#DCFCE7'; color = '#15803D'; }
+                          else if (tag === 'ccp') { bg = '#FEF08A'; color = '#854D0E'; }
+                          else if (tag === 'claustro') { bg = '#FAE8FF'; color = '#A21CAF'; }
+                          else if (tag === 'otras_reuniones') { bg = '#CFFAFE'; color = '#0E7490'; }
+
+                          return h('div', {
+                            style: {
+                              fontSize: '0.6rem',
+                              fontWeight: 700,
+                              padding: '0.1rem 0.25rem',
+                              borderRadius: '3px',
+                              background: bg,
+                              color: color,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              width: '100%'
+                            },
+                            title: `Calendario Escolar: ${calEvt.title || tagReadable}`
+                          }, displayText);
+                        })(),
+
+                        dayEvents.map((mEvt, mIdx) => {
+                          const tagClass = getMonthlyTagBadgeClass(mEvt.tag);
+                          const tagLabel = getMonthlyTagLabel(mEvt.tag);
+                          const subtagLabel = mEvt.subtag || '';
+                          const timeLabel = mEvt.time ? mEvt.time.trim() : '';
+
+                          return h('div', {
+                            key: mEvt.id || mIdx,
+                            style: {
+                              fontSize: '0.625rem',
+                              lineHeight: 1.2,
+                              background: 'var(--bg-card-subtle)',
+                              padding: '0.1rem 0.25rem',
+                              borderRadius: '3px',
+                              border: '1px solid var(--border-subtle)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.15rem',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            },
+                            title: `${tagLabel ? `[${tagLabel}] ` : ''}${subtagLabel ? `[${subtagLabel}] ` : ''}${timeLabel ? `${timeLabel} ` : ''}${mEvt.text || ''}`
+                          },
+                            tagLabel && h('span', { className: tagClass, style: { fontSize: '0.525rem', padding: '0.02rem 0.15rem', flexShrink: 0 } }, tagLabel),
+                            subtagLabel && h('span', { style: { fontSize: '0.525rem', padding: '0.02rem 0.15rem', background: 'var(--ink-blue)', color: '#FFF', borderRadius: '2px', fontWeight: 700, flexShrink: 0 } }, subtagLabel),
+                            h('span', { style: { fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 } }, mEvt.text || '')
+                          );
+                        })
+                      )
+                    );
+                  })
                 )
-              ),
-              h('div', { className: 'mini-calendar-grid' },
-                h('div', { className: 'mini-cal-day-header' }, 'Lu'),
-                h('div', { className: 'mini-cal-day-header' }, 'Ma'),
-                h('div', { className: 'mini-cal-day-header' }, 'Mi'),
-                h('div', { className: 'mini-cal-day-header' }, 'Ju'),
-                h('div', { className: 'mini-cal-day-header' }, 'Vi'),
-                h('div', { className: 'mini-cal-day-header weekend' }, 'Sá'),
-                h('div', { className: 'mini-cal-day-header weekend' }, 'Do'),
-                calendarCells.map((c, i) => {
-                  if (c.isOther) return h('div', { key: i, className: 'mini-cal-cell other-month' });
-                  return h('div', {
-                    key: i,
-                    className: `mini-cal-cell ${c.isToday ? 'today' : ''} ${c.tagClass}`,
-                    onClick: () => setSelectedDateForNotes(c.dateStr),
-                    title: c.dayEvt ? `${c.dayEvt.title || ''} (${formatDateDDMMYYYY(c.dateStr)})` : `Anotación (${formatDateDDMMYYYY(c.dateStr)})`
-                  },
-                    h('div', null, c.dayNum),
-                    c.hasVisibleMark && h('div', { style: { fontSize: '0.55rem', lineHeight: 1 } }, '📌')
-                  );
-                })
-              )
-            )
+              );
+            })()
           )
         ),
-        selectedDateForNotes && h(DateAnnotationModal, {
+        selectedDateForNotes && h(DayMonthlyEventsModal, {
           dateStr: selectedDateForNotes,
-          existingEvent: (data.calendarEvents || []).find(e => e.date === selectedDateForNotes),
-          onSave: handleSaveDateAnnotation,
-          onDelete: handleDeleteEvt,
-          onGoToWeeklyPlanner,
+          events: (data.monthlyEvents && data.monthlyEvents[selectedDateForNotes]) || [],
+          calendarEvents: data.calendarEvents || [],
+          onSave: (dStr, updatedEvents) => {
+            const nextMonthly = { ...(data.monthlyEvents || {}) };
+            if (!updatedEvents || updatedEvents.length === 0) {
+              delete nextMonthly[dStr];
+            } else {
+              nextMonthly[dStr] = updatedEvents;
+            }
+            const nextData = { ...data, monthlyEvents: nextMonthly };
+            setData(nextData);
+            setSelectedDateForNotes(null);
+            try {
+              localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify({ ...nextData, _lastUpdated: Date.now() }));
+              const pin = localStorage.getItem('planificador_sync_pin') || "584920";
+              autoPushToCloud(pin, nextData);
+            } catch (e) {}
+          },
           onClose: () => setSelectedDateForNotes(null)
         })
       );
@@ -6389,6 +6556,655 @@
             )
           )
         )
+      );
+    }
+
+    function getCalTagReadableName(tag) {
+      if (tag === 'festivo') return 'Festivo';
+      if (tag === 'no_lectivo' || tag === 'vacaciones') return 'Día no lectivo';
+      if (tag === 'evaluacion') return 'Evaluación';
+      if (tag === 'ccp') return 'Reunión CCP';
+      if (tag === 'claustro') return 'Claustro';
+      if (tag === 'otras_reuniones') return 'Reunión';
+      if (tag === 'trimestre') return 'Inicio/Fin Trimestre';
+      return 'Evento Escolar';
+    }
+
+    // --- MONTHLY DAY EVENTS MODAL ---
+    function DayMonthlyEventsModal({ dateStr, events = [], calendarEvents = [], onSave, onClose }) {
+      const [localEvents, setLocalEvents] = useState(() => {
+        return Array.isArray(events) ? JSON.parse(JSON.stringify(events)) : [];
+      });
+
+      const [draggedIdx, setDraggedIdx] = useState(null);
+
+      const formattedDate = formatDateDDMMYYYY(dateStr);
+      const calEvt = (calendarEvents || []).find(e => e.date === dateStr);
+
+      const handleAddEvent = () => {
+        const newEvt = {
+          id: `m_evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          text: '',
+          tag: 'sin_categoria',
+          subtag: '',
+          time: ''
+        };
+        setLocalEvents([...localEvents, newEvt]);
+      };
+
+      const handleEventChange = (idx, field, value) => {
+        const updated = [...localEvents];
+        if (updated[idx]) {
+          updated[idx] = { ...updated[idx], [field]: value };
+          setLocalEvents(updated);
+        }
+      };
+
+      const handleDuplicateEvent = (idx) => {
+        const target = localEvents[idx];
+        if (!target) return;
+        const duplicated = {
+          ...JSON.parse(JSON.stringify(target)),
+          id: `m_evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+        };
+        const updated = [...localEvents];
+        updated.splice(idx + 1, 0, duplicated);
+        setLocalEvents(updated);
+      };
+
+      const handleRemoveEvent = (idx) => {
+        setLocalEvents(localEvents.filter((_, i) => i !== idx));
+      };
+
+      const handleMoveUp = (idx) => {
+        if (idx <= 0) return;
+        const updated = [...localEvents];
+        const temp = updated[idx];
+        updated[idx] = updated[idx - 1];
+        updated[idx - 1] = temp;
+        setLocalEvents(updated);
+      };
+
+      const handleMoveDown = (idx) => {
+        if (idx >= localEvents.length - 1) return;
+        const updated = [...localEvents];
+        const temp = updated[idx];
+        updated[idx] = updated[idx + 1];
+        updated[idx + 1] = temp;
+        setLocalEvents(updated);
+      };
+
+      const handleDragStart = (e, idx) => {
+        setDraggedIdx(idx);
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+        }
+      };
+
+      const handleDragOver = (e) => {
+        e.preventDefault();
+      };
+
+      const handleDrop = (e, targetIdx) => {
+        e.preventDefault();
+        if (draggedIdx === null || draggedIdx === targetIdx) return;
+        const updated = [...localEvents];
+        const itemToMove = updated.splice(draggedIdx, 1)[0];
+        updated.splice(targetIdx, 0, itemToMove);
+        setLocalEvents(updated);
+        setDraggedIdx(null);
+      };
+
+      const handleInsertLinkToEvent = (idx) => {
+        const currentEvt = localEvents[idx];
+        if (!currentEvt) return;
+        const currentText = (currentEvt.text || '').trim();
+
+        const urlInput = window.prompt(
+          '🔗 Insertar Enlace Web\n\n1. Pega la dirección URL (Drive, YouTube, Canva, web...):',
+          'https://'
+        );
+
+        if (!urlInput || urlInput.trim() === '' || urlInput.trim() === 'https://') return;
+        const cleanUrl = urlInput.trim();
+
+        const defaultLabel = currentText ? currentText : 'Ver recurso / enlace';
+        const labelInput = window.prompt(
+          '📝 Texto visible que tendrá el enlace:\n(Ej: Ficha de lectura, Unidad 3, Canva...)',
+          defaultLabel
+        );
+
+        const displayLabel = (labelInput && labelInput.trim()) ? labelInput.trim() : 'Enlace Web';
+        const markdownLink = `[${displayLabel}](${cleanUrl})`;
+
+        let newText = '';
+        if (!currentText) {
+          newText = markdownLink;
+        } else if (currentText === displayLabel) {
+          newText = markdownLink;
+        } else if (currentText.includes(displayLabel)) {
+          newText = currentText.replace(displayLabel, markdownLink);
+        } else {
+          newText = `${currentText} ${markdownLink}`;
+        }
+
+        handleEventChange(idx, 'text', newText);
+      };
+
+      const handleRemoveLinkFromEvent = (idx) => {
+        const blk = localEvents[idx];
+        if (!blk) return;
+        const currentText = blk.text || '';
+        let cleaned = currentText.replace(/\[(.*?)\]\((https?:\/\/[^\s\)]+)\)/gi, '$1');
+        cleaned = cleaned.replace(/(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi, '').trim();
+        handleEventChange(idx, 'text', cleaned);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const validEvents = localEvents.filter(evt => evt && (
+          (evt.text && evt.text.trim().length > 0) ||
+          (evt.tag && evt.tag !== 'sin_categoria' && evt.tag !== 'ninguna') ||
+          (evt.subtag && evt.subtag.trim().length > 0) ||
+          (evt.time && evt.time.trim().length > 0)
+        ));
+        onSave(dateStr, validEvents);
+      };
+
+      const eventTags = [
+        { key: 'sin_categoria', label: 'Sin categoría' },
+        { key: 'examen', label: 'Examen' },
+        { key: 'tarea_evaluable', label: 'Tarea evaluable' },
+        { key: 'evaluacion', label: 'Evaluación' },
+        { key: 'actividad', label: 'Actividad' },
+        { key: 'reunion', label: 'Reunión' },
+        { key: 'salida', label: 'Salida' }
+      ];
+
+      const subTags = [
+        { key: '', label: 'Sin grupo' },
+        { key: '4ESO A', label: '4ESO A' },
+        { key: '4ESO C', label: '4ESO C' },
+        { key: 'BAT1 C/G', label: 'BAT1 C/G' },
+        { key: 'LU', label: 'LU' }
+      ];
+
+      return h('div', { className: 'modal-overlay', onClick: onClose },
+        h('div', { className: 'modal-content', style: { maxWidth: '780px' }, onClick: e => e.stopPropagation() },
+          h('div', { className: 'modal-header' },
+            h('div', null,
+              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, 'Programación Mensual por Día'),
+              h('p', { style: { fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.1rem' } }, `📅 ${formattedDate}`)
+            ),
+            h('button', { onClick: onClose, type: 'button' }, '✕')
+          ),
+          h('form', { onSubmit: handleSubmit },
+            h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '0.85rem' } },
+              calEvt && h('div', {
+                style: {
+                  background: '#FFFDF0',
+                  border: '1px solid #FDE047',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  gap: '0.6rem',
+                  alignItems: 'flex-start'
+                }
+              },
+                h('span', { style: { fontSize: '1.2rem', lineHeight: 1 } }, '📌'),
+                h('div', null,
+                  h('div', { style: { fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink-blue)' } },
+                    `Calendario Escolar: ${calEvt.title || getCalTagReadableName(calEvt.tag || calEvt.type)} ${calEvt.time ? `(${calEvt.time})` : ''}`
+                  ),
+                  calEvt.details && h('div', { style: { fontSize: '0.775rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.3 } }, calEvt.details)
+                )
+              ),
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                h('span', { style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--ink-blue)' } }, `Eventos del día (${localEvents.length})`),
+                h('button', { type: 'button', className: 'btn btn-gold', style: { padding: '0.2rem 0.6rem', fontSize: '0.775rem' }, onClick: handleAddEvent }, '➕ Añadir Evento')
+              ),
+              localEvents.length === 0 ? h('div', { style: { padding: '1rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.825rem' } }, 'No hay eventos programados para este día. Pulsa "➕ Añadir Evento".') :
+              h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.65rem' } },
+                localEvents.map((evt, idx) => {
+                  const hasLink = evt.text && /https?:\/\/|www\.|\[.*?\]\(.*?\)/i.test(evt.text);
+
+                  return h('div', {
+                    key: evt.id || idx,
+                    draggable: true,
+                    onDragStart: e => handleDragStart(e, idx),
+                    onDragOver: handleDragOver,
+                    onDrop: e => handleDrop(e, idx),
+                    style: {
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.4rem',
+                      background: draggedIdx === idx ? '#E0F2FE' : 'var(--bg-card-subtle)',
+                      padding: '0.65rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)',
+                      opacity: draggedIdx === idx ? 0.6 : 1,
+                      transition: 'all 0.15s ease'
+                    }
+                  },
+                    /* ROW 1: REORDER HANDLES, TAG, SUBTAG, TIME, DUPLICATE, DELETE */
+                    h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' } },
+                      h('div', { style: { display: 'flex', gap: '0.1rem', alignItems: 'center', cursor: 'grab' }, title: 'Arrastrar para reordenar' },
+                        h('span', { style: { fontSize: '0.85rem', color: 'var(--text-muted)', paddingRight: '0.15rem' } }, '⋮⋮'),
+                        h('button', {
+                          type: 'button',
+                          disabled: idx === 0,
+                          onClick: () => handleMoveUp(idx),
+                          style: { border: 'none', background: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: '0.8rem', padding: '0 0.15rem' },
+                          title: 'Mover hacia arriba'
+                        }, '⬆️'),
+                        h('button', {
+                          type: 'button',
+                          disabled: idx === localEvents.length - 1,
+                          onClick: () => handleMoveDown(idx),
+                          style: { border: 'none', background: 'none', cursor: idx === localEvents.length - 1 ? 'default' : 'pointer', opacity: idx === localEvents.length - 1 ? 0.3 : 1, fontSize: '0.8rem', padding: '0 0.15rem' },
+                          title: 'Mover hacia abajo'
+                        }, '⬇️')
+                      ),
+                      h('select', {
+                        className: 'form-control',
+                        style: { width: '135px', padding: '0.3rem 0.4rem', fontSize: '0.775rem', fontWeight: 600 },
+                        value: evt.tag || 'sin_categoria',
+                        onChange: e => handleEventChange(idx, 'tag', e.target.value)
+                      },
+                        eventTags.map(t => h('option', { key: t.key, value: t.key }, t.label))
+                      ),
+                      h('select', {
+                        className: 'form-control',
+                        style: { width: '115px', padding: '0.3rem 0.4rem', fontSize: '0.775rem', fontWeight: 600, color: evt.subtag ? 'var(--ink-blue)' : 'var(--text-muted)' },
+                        value: evt.subtag || '',
+                        onChange: e => handleEventChange(idx, 'subtag', e.target.value)
+                      },
+                        subTags.map(st => h('option', { key: st.key, value: st.key }, st.label))
+                      ),
+                      h('input', {
+                        type: 'text',
+                        className: 'form-control',
+                        style: { width: '100px', padding: '0.3rem 0.4rem', fontSize: '0.775rem' },
+                        placeholder: 'Hora (09:00)',
+                        value: evt.time || '',
+                        onChange: e => handleEventChange(idx, 'time', e.target.value)
+                      }),
+                      h('div', { style: { marginLeft: 'auto', display: 'flex', gap: '0.2rem', alignItems: 'center' } },
+                        h('button', {
+                          type: 'button',
+                          onClick: () => handleDuplicateEvent(idx),
+                          style: { border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.25rem' },
+                          title: 'Copiar / Duplicar este evento'
+                        }, '📋'),
+                        h('button', {
+                          type: 'button',
+                          onClick: () => handleRemoveEvent(idx),
+                          style: { border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.25rem' },
+                          title: 'Eliminar este evento'
+                        }, '🗑️')
+                      )
+                    ),
+                    /* ROW 2: DESCRIPTION TEXT & LINK BUTTONS */
+                    h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                      h('input', {
+                        type: 'text',
+                        className: 'form-control',
+                        style: { flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.825rem' },
+                        placeholder: 'Descripción del evento (ej: Examen Tema 4, Salida al teatro...)...',
+                        value: evt.text || '',
+                        onChange: e => handleEventChange(idx, 'text', e.target.value)
+                      }),
+                      h('button', {
+                        type: 'button',
+                        onClick: () => handleInsertLinkToEvent(idx),
+                        style: { border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', fontSize: '1rem', padding: '0 0.2rem' },
+                        title: '🔗 Enlazar este texto con una dirección web'
+                      }, '🔗'),
+                      hasLink && h('button', {
+                        type: 'button',
+                        onClick: () => handleRemoveLinkFromEvent(idx),
+                        style: { border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: '0.95rem', padding: '0 0.2rem' },
+                        title: 'Quitar el hipervínculo manteniendo el texto'
+                      }, '🔗❌')
+                    )
+                  );
+                })
+              )
+            ),
+            h('div', { className: 'modal-footer' },
+              h('button', { type: 'button', className: 'btn btn-secondary', onClick: onClose }, 'Cancelar'),
+              h('button', { type: 'submit', className: 'btn btn-primary' }, 'Guardar Eventos')
+            )
+          )
+        )
+      );
+    }
+
+    // --- MONTHLY PLANNING VIEW ---
+    function MonthlyPlanningView({ data, setData }) {
+      const orderedMonths = getReorderedSchoolMonths();
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const [activeMonthKey, setActiveMonthKey] = useState(() => {
+        const first = orderedMonths[0];
+        return `${first.year}-${String(first.monthNum).padStart(2, '0')}`;
+      });
+
+      const [editingDateStr, setEditingDateStr] = useState(null);
+
+      const selectedMonthObj = orderedMonths.find(m => `${m.year}-${String(m.monthNum).padStart(2, '0')}` === activeMonthKey) || orderedMonths[0];
+      const { year, monthNum, name: monthTitle } = selectedMonthObj;
+
+      const firstDayObj = new Date(year, monthNum - 1, 1);
+      const daysInMonth = new Date(year, monthNum, 0).getDate();
+      const firstDayOfWeek = firstDayObj.getDay();
+      const startOffset = (firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1);
+
+      const dayCells = [];
+      for (let i = 0; i < startOffset; i++) {
+        dayCells.push({ isBlank: true, id: `blank_${i}` });
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dObj = new Date(year, monthNum - 1, d);
+        const dayOfWeek = dObj.getDay();
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const isToday = (dateStr === todayStr);
+
+        const calEvt = (data.calendarEvents || []).find(e => e.date === dateStr);
+        const dayEvents = (data.monthlyEvents && data.monthlyEvents[dateStr]) || [];
+
+        dayCells.push({
+          isBlank: false,
+          dayNum: d,
+          dateStr,
+          isWeekend,
+          isToday,
+          calEvt,
+          dayEvents
+        });
+      }
+
+      const handleSaveDayEvents = (dateStr, updatedEvents) => {
+        const nextMonthly = { ...(data.monthlyEvents || {}) };
+        if (!updatedEvents || updatedEvents.length === 0) {
+          delete nextMonthly[dateStr];
+        } else {
+          nextMonthly[dateStr] = updatedEvents;
+        }
+        const nextData = { ...data, monthlyEvents: nextMonthly };
+        setData(nextData);
+        setEditingDateStr(null);
+
+        try {
+          localStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify({ ...nextData, _lastUpdated: Date.now() }));
+          const pin = localStorage.getItem('planificador_sync_pin') || "584920";
+          autoPushToCloud(pin, nextData);
+        } catch (e) {
+          console.error("Error al guardar eventos mensuales:", e);
+        }
+      };
+
+      const getMonthlyTagBadgeClass = (tag) => {
+        if (tag === 'examen') return 'lesson-badge examen';
+        if (tag === 'tarea_evaluable' || tag === 'entrega') return 'lesson-badge actividades';
+        if (tag === 'evaluacion') return 'lesson-badge explicacion';
+        if (tag === 'actividad') return 'lesson-badge correccion';
+        if (tag === 'reunion') return 'lesson-badge tesa';
+        if (tag === 'salida') return 'lesson-badge claustro';
+        if (tag === 'importante') return 'lesson-badge correccion';
+        return '';
+      };
+
+      const getMonthlyTagLabel = (tag) => {
+        if (tag === 'examen') return 'EXAMEN';
+        if (tag === 'tarea_evaluable' || tag === 'entrega') return 'TAREA EVALUABLE';
+        if (tag === 'evaluacion') return 'EVALUACIÓN';
+        if (tag === 'actividad') return 'ACTIVIDAD';
+        if (tag === 'reunion') return 'REUNIÓN';
+        if (tag === 'salida') return 'SALIDA';
+        if (tag === 'importante') return '⭐ IMPORTANTE';
+        return '';
+      };
+
+      return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
+        /* SECTION HEADER */
+        h('div', { className: 'section-header' },
+          h('div', null,
+            h('h2', { className: 'section-title' }, 'Planificación Mensual')
+          ),
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem' } },
+            h('span', { className: 'badge badge-gold', style: { fontSize: '0.8rem', padding: '0.35rem 0.75rem' } }, `🗓️ ${monthTitle}`)
+          )
+        ),
+
+        /* MONTH TABS (ELEGANT PILL LAYOUT WITH NO SCROLLING) */
+        h('div', { style: { display: 'flex', gap: '0.3rem', width: '100%', alignItems: 'stretch' } },
+          orderedMonths.map(m => {
+            const key = `${m.year}-${String(m.monthNum).padStart(2, '0')}`;
+            const isActive = key === activeMonthKey;
+            const isCurrentMonth = m.year === today.getFullYear() && m.monthNum === (today.getMonth() + 1);
+
+            const ELEGANT_MONTH_COLORS = {
+              9:  { bg: '#F0FDF4', text: '#047857', border: '#A7F3D0', activeBg: 'linear-gradient(135deg, #059669, #047857)', glow: 'rgba(5, 150, 105, 0.25)' },
+              10: { bg: '#FFF7ED', text: '#C2410C', border: '#FED7AA', activeBg: 'linear-gradient(135deg, #EA580C, #C2410C)', glow: 'rgba(234, 88, 12, 0.25)' },
+              11: { bg: '#FDF2F8', text: '#BE185D', border: '#FBCFE8', activeBg: 'linear-gradient(135deg, #DB2777, #9D174D)', glow: 'rgba(219, 39, 119, 0.25)' },
+              12: { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA', activeBg: 'linear-gradient(135deg, #EF4444, #B91C1C)', glow: 'rgba(239, 68, 68, 0.25)' },
+              1:  { bg: '#F0F9FF', text: '#0284C7', border: '#BAE6FD', activeBg: 'linear-gradient(135deg, #0284C7, #0369A1)', glow: 'rgba(2, 132, 199, 0.25)' },
+              2:  { bg: '#FAF5FF', text: '#7E22CE', border: '#E9D5FF', activeBg: 'linear-gradient(135deg, #8B5CF6, #6B21A8)', glow: 'rgba(139, 92, 246, 0.25)' },
+              3:  { bg: '#ECFDF5', text: '#15803D', border: '#A7F3D0', activeBg: 'linear-gradient(135deg, #10B981, #047857)', glow: 'rgba(16, 185, 129, 0.25)' },
+              4:  { bg: '#FFFBEB', text: '#B45309', border: '#FDE68A', activeBg: 'linear-gradient(135deg, #F59E0B, #B45309)', glow: 'rgba(245, 158, 11, 0.25)' },
+              5:  { bg: '#FFF1F2', text: '#E11D48', border: '#FECDD3', activeBg: 'linear-gradient(135deg, #F43F5E, #BE123C)', glow: 'rgba(244, 63, 94, 0.25)' },
+              6:  { bg: '#ECFEFF', text: '#0891B2', border: '#A5F3FC', activeBg: 'linear-gradient(135deg, #06B6D4, #0E7490)', glow: 'rgba(6, 182, 212, 0.25)' },
+              7:  { bg: '#FEFCE8', text: '#A16207', border: '#FEF08A', activeBg: 'linear-gradient(135deg, #EAB308, #A16207)', glow: 'rgba(234, 179, 8, 0.25)' },
+              8:  { bg: '#F9FAFB', text: '#374151', border: '#E5E7EB', activeBg: 'linear-gradient(135deg, #4B5563, #1F2937)', glow: 'rgba(75, 85, 99, 0.25)' }
+            };
+
+            const tabColor = ELEGANT_MONTH_COLORS[m.monthNum] || { bg: '#F9FAFB', text: '#374151', border: '#E5E7EB', activeBg: '#4B5563', glow: 'rgba(0,0,0,0.1)' };
+            const monthLabel = m.name.split(' ')[0];
+
+            return h('button', {
+              key,
+              className: 'btn',
+              title: m.name,
+              style: {
+                flex: '1 1 0px',
+                minWidth: 0,
+                fontSize: '0.775rem',
+                padding: '0.45rem 0.2rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                textAlign: 'center',
+                fontWeight: isActive ? 700 : 600,
+                letterSpacing: '0.2px',
+                background: isActive ? tabColor.activeBg : tabColor.bg,
+                color: isActive ? '#FFFFFF' : tabColor.text,
+                border: isActive ? 'none' : `1.5px solid ${tabColor.border}`,
+                borderRadius: '8px',
+                boxShadow: isActive ? `0 3px 10px ${tabColor.glow}` : '0 1px 3px rgba(0, 0, 0, 0.03)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease-in-out',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.08rem'
+              },
+              onClick: () => setActiveMonthKey(key)
+            },
+              h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' } }, monthLabel),
+              isCurrentMonth && h('span', {
+                style: {
+                  fontSize: '0.525rem',
+                  lineHeight: 1,
+                  background: isActive ? 'rgba(255, 255, 255, 0.3)' : 'var(--gold-accent)',
+                  color: '#FFFFFF',
+                  padding: '0.08rem 0.25rem',
+                  borderRadius: '10px',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px'
+                }
+              }, '• HOY')
+            );
+          })
+        ),
+
+        /* BIG MONTH CARD */
+        h('div', { className: 'card', style: { padding: '1.25rem' } },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '2px solid var(--border-color)' } },
+            h('h3', { style: { fontSize: '1.4rem', color: 'var(--ink-blue)', margin: 0, textTransform: 'capitalize' } }, `📅 ${monthTitle}`)
+          ),
+
+          /* MONTH GRID (WEEKDAYS 1fr, WEEKENDS 0.5fr FOR EXTRA WEEKDAY SPACE) */
+          h('div', { className: 'month-cal-grid', style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 0.5fr 0.5fr', gap: '0.4rem' } },
+            /* HEADERS */
+            h('div', { className: 'month-day-header' }, 'Lunes'),
+            h('div', { className: 'month-day-header' }, 'Martes'),
+            h('div', { className: 'month-day-header' }, 'Miércoles'),
+            h('div', { className: 'month-day-header' }, 'Jueves'),
+            h('div', { className: 'month-day-header' }, 'Viernes'),
+            h('div', { className: 'month-day-header weekend', title: 'Sábado' }, 'Sáb'),
+            h('div', { className: 'month-day-header weekend', title: 'Domingo' }, 'Dom'),
+
+            /* DAY CELLS */
+            dayCells.map((cell, idx) => {
+              if (cell.isBlank) {
+                return h('div', { key: cell.id || idx, className: 'month-day-cell other-month', style: { minHeight: '90px', background: 'none', border: 'none', cursor: 'default' } });
+              }
+
+              const { dayNum, dateStr, isWeekend, isToday, calEvt, dayEvents } = cell;
+              const calTagClass = calEvt?.tag ? `tag-${calEvt.tag}` : (isWeekend ? 'weekend-default' : '');
+
+              return h('div', {
+                key: dateStr,
+                className: `month-day-cell ${isToday ? 'today' : ''} ${calTagClass}`,
+                onClick: () => setEditingDateStr(dateStr),
+                style: {
+                  minHeight: '105px',
+                  padding: isWeekend ? '0.35rem 0.2rem' : '0.45rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  alignItems: 'stretch',
+                  cursor: 'pointer',
+                  border: isToday ? '2px solid var(--gold-accent)' : (isWeekend ? '1px solid #FECACA' : '1px solid var(--border-color)'),
+                  background: isToday ? '#FFFDF0' : (isWeekend ? '#FEF2F2' : '#FFFFFF'),
+                  transition: 'all 0.15s ease'
+                }
+              },
+                /* CELL HEADER */
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
+                  h('span', { style: { fontWeight: isToday ? 800 : 700, fontSize: '0.9rem', color: isToday ? 'var(--burgundy)' : (isWeekend ? '#DC2626' : 'var(--ink-blue)') } }, dayNum)
+                ),
+
+                /* CELL CONTENT (CALENDAR READ-ONLY + MONTHLY EVENTS) */
+                h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto', maxHeight: '75px' } },
+                  /* GENERAL CALENDAR EVENT MARKER (READ-ONLY) */
+                  calEvt && (() => {
+                    const tag = calEvt.tag || calEvt.type || '';
+                    const tagReadable = getCalTagReadableName(tag);
+                    const eventLabel = calEvt.title ? calEvt.title.trim() : tagReadable;
+                    const timeLabel = calEvt.time ? ` (${calEvt.time})` : '';
+                    const displayText = `📌 ${eventLabel}${timeLabel}`;
+
+                    let bg = '#E2E8F0';
+                    let color = '#334155';
+
+                    if (tag === 'festivo') {
+                      bg = '#EF4444';
+                      color = '#FFFFFF';
+                    } else if (tag === 'no_lectivo' || tag === 'vacaciones') {
+                      bg = '#F87171';
+                      color = '#FFFFFF';
+                    } else if (tag === 'evaluacion') {
+                      bg = '#DCFCE7';
+                      color = '#15803D';
+                    } else if (tag === 'ccp') {
+                      bg = '#FEF08A';
+                      color = '#854D0E';
+                    } else if (tag === 'claustro') {
+                      bg = '#FAE8FF';
+                      color = '#A21CAF';
+                    } else if (tag === 'otras_reuniones') {
+                      bg = '#CFFAFE';
+                      color = '#0E7490';
+                    }
+
+                    const tooltipText = `Calendario Escolar: ${calEvt.title || tagReadable}${calEvt.details ? ` - ${calEvt.details}` : ''}`;
+
+                    return h('div', {
+                      style: {
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.35rem',
+                        borderRadius: '4px',
+                        background: bg,
+                        color: color,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        width: '100%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start'
+                      },
+                      title: tooltipText
+                    }, displayText);
+                  })(),
+
+                  /* MONTHLY PLANNING EVENTS FOR THIS DAY */
+                  dayEvents.map((mEvt, mIdx) => {
+                    const tagClass = getMonthlyTagBadgeClass(mEvt.tag);
+                    const tagLabel = getMonthlyTagLabel(mEvt.tag);
+                    const subtagLabel = mEvt.subtag || '';
+                    const timeLabel = mEvt.time ? mEvt.time.trim() : '';
+                    const fullTitle = `${tagLabel ? `[${tagLabel}] ` : ''}${subtagLabel ? `[${subtagLabel}] ` : ''}${timeLabel ? `${timeLabel} ` : ''}${mEvt.text || ''}`;
+
+                    return h('div', {
+                      key: mEvt.id || mIdx,
+                      title: fullTitle,
+                      style: {
+                        fontSize: '0.725rem',
+                        lineHeight: 1.2,
+                        background: 'var(--bg-card-subtle)',
+                        padding: '0.18rem 0.35rem',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-subtle)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        width: '100%'
+                      }
+                    },
+                      tagLabel && h('span', { className: tagClass, style: { fontSize: '0.58rem', padding: '0.05rem 0.25rem', flexShrink: 0 } }, tagLabel),
+                      subtagLabel && h('span', { style: { fontSize: '0.58rem', padding: '0.05rem 0.25rem', background: 'var(--ink-blue)', color: '#FFF', borderRadius: '3px', fontWeight: 700, flexShrink: 0 } }, subtagLabel),
+                      timeLabel && h('span', { style: { fontSize: '0.625rem', color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 } }, `⏰ ${timeLabel}`),
+                      h('span', { style: { fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 } }, renderTextWithLinks(mEvt.text))
+                    );
+                  })
+                ),
+
+                /* FOOTER COUNT */
+                dayEvents.length > 0 && h('div', { style: { fontSize: '0.65rem', color: 'var(--gold-accent)', fontWeight: 700, textAlign: 'right', marginTop: '0.2rem' } }, `${dayEvents.length} evento${dayEvents.length > 1 ? 's' : ''}`)
+              );
+            })
+          )
+        ),
+
+        /* EDIT DAY EVENTS MODAL */
+        editingDateStr && h(DayMonthlyEventsModal, {
+          dateStr: editingDateStr,
+          events: (data.monthlyEvents && data.monthlyEvents[editingDateStr]) || [],
+          calendarEvents: data.calendarEvents || [],
+          onSave: handleSaveDayEvents,
+          onClose: () => setEditingDateStr(null)
+        })
       );
     }
 
