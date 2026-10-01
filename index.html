@@ -1831,6 +1831,12 @@
 
         if (remoteTime > localTime + 500) {
           const cleanRemote = sanitizeMasterData(remoteData);
+          try {
+            const currentLoc = localStorage.getItem('planificador_docente_nuria_rt_2026_2027');
+            if (currentLoc) {
+              safeStorage.setItem('planificador_safety_backup_before_sync', currentLoc);
+            }
+          } catch(e) {}
           try { safeStorage.setItem('planificador_docente_nuria_rt_2026_2027', JSON.stringify(cleanRemote)); } catch(e) {}
           onNewData(cleanRemote);
           return true;
@@ -7504,6 +7510,21 @@
         reader.readAsText(file);
       };
 
+      const handleRestoreSafetyBackup = () => {
+        try {
+          const b = safeStorage.getItem('planificador_safety_backup_before_sync');
+          if (b) {
+            const parsed = JSON.parse(b);
+            onImport(parsed);
+            alert('🎉 ¡Se ha restaurado con éxito la copia de seguridad previa a la sincronización!');
+          } else {
+            alert('No se encontró ninguna copia previa en la memoria de este navegador.');
+          }
+        } catch(e) {
+          alert('No se pudo restaurar la copia previa.');
+        }
+      };
+
       return h('div', { className: 'modal-overlay', onClick: onClose },
         h('div', { className: 'modal-content', style: { maxWidth: '640px' }, onClick: e => e.stopPropagation() },
           h('div', { className: 'modal-header' },
@@ -7595,6 +7616,15 @@
                   h('input', { type: 'file', accept: '.json', onChange: handleImportFile, style: { display: 'none' } })
                 )
               )
+            ),
+
+            /* SAFETY UNDO SYNC BUTTON */
+            safeStorage.getItem('planificador_safety_backup_before_sync') && h('div', { style: { background: '#FEF3C7', border: '1px solid #FCD34D', padding: '0.75rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+              h('div', null,
+                h('strong', { style: { fontSize: '0.825rem', color: '#92400E', display: 'block' } }, '⏪ Copia Automática Previa Detectada'),
+                h('span', { style: { fontSize: '0.75rem', color: '#B45309' } }, 'Puedes deshacer la última sincronización y volver a tus datos anteriores.')
+              ),
+              h('button', { className: 'btn btn-gold', onClick: handleRestoreSafetyBackup, style: { fontSize: '0.8rem', padding: '0.4rem 0.75rem' } }, '⏪ Deshacer Sincronización')
             ),
 
             /* DANGER ZONE: RESET DATA */
