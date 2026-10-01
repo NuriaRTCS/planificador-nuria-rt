@@ -3539,6 +3539,17 @@
       const [subject, setSubject] = useState(slotData.subject || '');
       const [group, setGroup] = useState(slotData.group || '');
       const [blocks, setBlocks] = useState(() => ensureArray(slotData.blocks));
+      const [selectedBlockIndices, setSelectedBlockIndices] = useState([]);
+      const [copiedBlocksList, setCopiedBlocksList] = useState(() => {
+        try {
+          const savedList = localStorage.getItem('planificador_copied_blocks');
+          if (savedList) return JSON.parse(savedList);
+          const singleSaved = localStorage.getItem('planificador_copied_block');
+          return singleSaved ? [JSON.parse(singleSaved)] : [];
+        } catch (e) {
+          return [];
+        }
+      });
       const [copiedBlock, setCopiedBlock] = useState(() => {
         try {
           const saved = localStorage.getItem('planificador_copied_block');
@@ -3590,13 +3601,73 @@
         setBlocks([...blocks, { type: 'explicacion', text: '' }]);
       };
 
+      const handleToggleSelectBlock = (idx) => {
+        if (selectedBlockIndices.includes(idx)) {
+          setSelectedBlockIndices(selectedBlockIndices.filter(i => i !== idx));
+        } else {
+          setSelectedBlockIndices([...selectedBlockIndices, idx]);
+        }
+      };
+
+      const handleToggleSelectAllBlocks = () => {
+        if (selectedBlockIndices.length === blocks.length) {
+          setSelectedBlockIndices([]);
+        } else {
+          setSelectedBlockIndices(blocks.map((_, i) => i));
+        }
+      };
+
       const handleCopyBlock = (blk) => {
         try {
+          localStorage.setItem('planificador_copied_blocks', JSON.stringify([blk]));
           localStorage.setItem('planificador_copied_block', JSON.stringify(blk));
-          setCopiedBlock(blk);
+          setCopiedBlocksList([blk]);
           setCopySuccessMsg('📋 ¡Bloque copiado al portapapeles!');
           setTimeout(() => setCopySuccessMsg(''), 2500);
         } catch (e) {}
+      };
+
+      const handleCopySelectedBlocks = () => {
+        if (selectedBlockIndices.length === 0) return;
+        const toCopy = selectedBlockIndices.map(i => blocks[i]).filter(Boolean);
+        try {
+          localStorage.setItem('planificador_copied_blocks', JSON.stringify(toCopy));
+          if (toCopy.length === 1) {
+            localStorage.setItem('planificador_copied_block', JSON.stringify(toCopy[0]));
+          }
+          setCopiedBlocksList(toCopy);
+          setCopySuccessMsg(`📋 ¡${toCopy.length} bloque${toCopy.length > 1 ? 's copiados' : ' copiado'}!`);
+          setTimeout(() => setCopySuccessMsg(''), 2500);
+        } catch (e) {}
+      };
+
+      const handleCopyAllBlocks = () => {
+        if (blocks.length === 0) return;
+        try {
+          localStorage.setItem('planificador_copied_blocks', JSON.stringify(blocks));
+          setCopiedBlocksList(blocks);
+          setCopySuccessMsg(`📋 ¡Los ${blocks.length} bloques han sido copiados!`);
+          setTimeout(() => setCopySuccessMsg(''), 2500);
+        } catch (e) {}
+      };
+
+      const handlePasteMultipleBlocks = () => {
+        if (!copiedBlocksList || copiedBlocksList.length === 0) return;
+        const newBlocksToAppend = copiedBlocksList.map(b => ({
+          type: b.type || 'explicacion',
+          text: b.text || ''
+        }));
+        setBlocks([...blocks, ...newBlocksToAppend]);
+        setCopySuccessMsg(`📋 ¡${newBlocksToAppend.length} bloque${newBlocksToAppend.length > 1 ? 's pegados' : ' pegado'}!`);
+        setTimeout(() => setCopySuccessMsg(''), 2500);
+      };
+
+      const handleDeleteSelectedBlocks = () => {
+        if (selectedBlockIndices.length === 0) return;
+        if (!window.confirm(`¿Estás seguro/a de que deseas eliminar los ${selectedBlockIndices.length} bloques seleccionados?`)) return;
+        const updated = blocks.filter((_, idx) => !selectedBlockIndices.includes(idx));
+        setBlocks(updated);
+        setSelectedBlockIndices([]);
       };
 
       const handlePasteBlock = () => {
@@ -3613,6 +3684,7 @@
 
       const handleRemoveBlock = (bIdx) => {
         setBlocks(blocks.filter((_, idx) => idx !== bIdx));
+        setSelectedBlockIndices(selectedBlockIndices.filter(i => i !== bIdx));
       };
 
       const handleInsertLinkToBlock = (bIdx) => {
@@ -3730,44 +3802,79 @@
               }, copySuccessMsg),
 
               h('div', { style: { marginTop: '0.35rem' } },
-                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', flexWrap: 'wrap', gap: '0.35rem' } },
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' } },
                   h('label', { className: 'form-label', style: { marginBottom: 0 } }, 'Bloques de Trabajo de la Sesión'),
-                  h('div', { style: { display: 'flex', gap: '0.35rem' } },
-                    copiedBlock && h('button', {
+                  h('div', { style: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' } },
+                    copiedBlocksList.length > 0 && h('button', {
                       type: 'button',
                       className: 'btn btn-secondary',
-                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: 'var(--ink-blue)', borderColor: '#93C5FD', background: '#EFF6FF', fontWeight: 600 },
-                      onClick: handlePasteBlock,
-                      title: `Pegar bloque copiado: "${copiedBlock.text || 'Sin texto'}"`
-                    }, '📋 Pegar Bloque Copiado'),
-                    h('button', {
+                      style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem', color: 'var(--ink-blue)', borderColor: '#93C5FD', background: '#EFF6FF', fontWeight: 700 },
+                      onClick: handlePasteMultipleBlocks,
+                      title: `Pegar ${copiedBlocksList.length} bloque(s) copiado(s)`
+                    }, `📋 Pegar ${copiedBlocksList.length} Bloque${copiedBlocksList.length > 1 ? 's' : ''}`),
+                    blocks.length > 1 && h('button', {
                       type: 'button',
                       className: 'btn btn-secondary',
-                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#2563EB', borderColor: '#93C5FD', background: '#EFF6FF', fontWeight: 600 },
-                      onClick: () => handleInsertLinkToBlock(blocks.length > 0 ? blocks.length - 1 : 0),
-                      title: 'Insertar un enlace web o hipervínculo en el bloque'
-                    }, '🔗 Enlazar Texto'),
-                    hasLinkInAnyBlock && h('button', {
-                      type: 'button',
-                      className: 'btn btn-secondary',
-                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#DC2626', borderColor: '#FCA5A5', background: '#FEF2F2', fontWeight: 600 },
-                      onClick: () => handleRemoveLinkFromBlock(),
-                      title: 'Quitar el hipervínculo o URL manteniendo el texto'
-                    }, '🔗❌ Quitar Enlace'),
+                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem', fontWeight: 600 },
+                      onClick: handleCopyAllBlocks,
+                      title: 'Copiar TODOS los bloques de esta sesión'
+                    }, `📋 Copiar Todos (${blocks.length})`),
                     h('button', {
                       type: 'button',
                       className: 'btn btn-gold',
-                      style: { padding: '0.2rem 0.5rem', fontSize: '0.75rem' },
+                      style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' },
                       onClick: handleAddBlock
                     }, '➕ Añadir Bloque')
                   )
                 ),
-                h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '0.45rem' } }, '🔗 Usa "🔗 Enlazar Texto" para hipervínculos. Arrastra el icono ✋ a la izquierda de cualquier bloque para reordenarlo.'),
-                blocks.length === 0 ? h('div', { style: { padding: '0.85rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque"' + (copiedBlock ? ' o en "📋 Pegar Bloque Copiado".' : '.')) :
+
+                /* MULTI-BLOCK SELECTION TOOLBAR */
+                blocks.length > 0 && h('div', {
+                  style: {
+                    background: '#F8FAFC',
+                    border: '1px solid var(--border-subtle)',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '0.45rem',
+                    fontSize: '0.75rem'
+                  }
+                },
+                  h('label', { style: { display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, cursor: 'pointer', margin: 0 } },
+                    h('input', {
+                      type: 'checkbox',
+                      checked: blocks.length > 0 && selectedBlockIndices.length === blocks.length,
+                      onChange: handleToggleSelectAllBlocks,
+                      style: { cursor: 'pointer' }
+                    }),
+                    h('span', null, selectedBlockIndices.length === blocks.length ? 'Desmarcar Todos' : `Seleccionar Todos (${blocks.length})`)
+                  ),
+
+                  selectedBlockIndices.length > 0 && h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                    h('button', {
+                      type: 'button',
+                      className: 'btn btn-secondary',
+                      style: { padding: '0.15rem 0.45rem', fontSize: '0.725rem', background: '#FEF3C7', color: '#92400E', borderColor: '#FDE68A', fontWeight: 700 },
+                      onClick: handleCopySelectedBlocks
+                    }, `📋 Copiar (${selectedBlockIndices.length})`),
+                    h('button', {
+                      type: 'button',
+                      className: 'btn btn-secondary',
+                      style: { padding: '0.15rem 0.45rem', fontSize: '0.725rem', background: '#FEF2F2', color: '#DC2626', borderColor: '#FCA5A5', fontWeight: 700 },
+                      onClick: handleDeleteSelectedBlocks
+                    }, `🗑️ Eliminar (${selectedBlockIndices.length})`)
+                  )
+                ),
+
+                h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '0.45rem' } }, '💡 Marca la casilla ☑️ de cada bloque para copiarlo o eliminarlo de forma múltiple. Arrastra ✋ para reordenar.'),
+                blocks.length === 0 ? h('div', { style: { padding: '0.85rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', fontSize: '0.8rem' } }, 'No hay bloques añadidos aún para esta hora. Haz clic en "➕ Añadir Bloque"' + (copiedBlocksList.length > 0 ? ` o en "📋 Pegar ${copiedBlocksList.length} Bloque(s)".` : '.')) :
                 h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem' } },
                   blocks.map((blk, bIdx) => {
                     const isDraggingThis = draggedIdx === bIdx;
                     const isOverThis = dragOverIdx === bIdx;
+                    const isSelected = selectedBlockIndices.includes(bIdx);
 
                     return h('div', {
                       key: bIdx,
@@ -3780,12 +3887,19 @@
                         alignItems: 'center',
                         padding: '0.35rem 0.45rem',
                         borderRadius: 'var(--radius-md)',
-                        background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : 'var(--bg-card-subtle)'),
-                        border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : '1px solid var(--border-subtle)'),
+                        background: isSelected ? '#FEF3C7' : (isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : 'var(--bg-card-subtle)')),
+                        border: isSelected ? '2px solid var(--gold-accent)' : (isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : '1px solid var(--border-subtle)')),
                         opacity: isDraggingThis ? 0.5 : 1,
                         transition: 'all 0.15s ease'
                       }
                     },
+                      h('input', {
+                        type: 'checkbox',
+                        checked: isSelected,
+                        onChange: () => handleToggleSelectBlock(bIdx),
+                        style: { cursor: 'pointer', width: '16px', height: '16px', margin: '0 0.15rem' },
+                        title: 'Seleccionar este bloque para copiar o eliminar de forma múltiple'
+                      }),
                       h('span', {
                         draggable: true,
                         onDragStart: (e) => handleDragStart(e, bIdx),
@@ -3877,6 +3991,14 @@
       const [newStudentNeae, setNewStudentNeae] = useState('');
       const [newStudentNotes, setNewStudentNotes] = useState('');
       const [studentSortBy, setStudentSortBy] = useState('lastName'); // 'lastName' | 'manual'
+
+      // Multi-Student Selection & Batch Actions State
+      const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+      const [studentBatchMsg, setStudentBatchMsg] = useState('');
+
+      useEffect(() => {
+        setSelectedStudentIds([]);
+      }, [activeGroupId]);
 
       // Dated Student Annotations Modal state
       const [activeStudentForNotes, setActiveStudentForNotes] = useState(null);
@@ -4105,6 +4227,137 @@
           return g;
         });
         setGroups(updatedGroups);
+        setSelectedStudentIds(selectedStudentIds.filter(id => id !== stId));
+      };
+
+      // --- BULK / BATCH ACTIONS FOR MULTIPLE SELECTED STUDENTS ---
+      const handleSelectAllStudents = () => {
+        if (selectedStudentIds.length === sortedStudents.length) {
+          setSelectedStudentIds([]);
+        } else {
+          setSelectedStudentIds(sortedStudents.map(s => s.id));
+        }
+      };
+
+      const handleToggleSelectStudent = (stId) => {
+        if (selectedStudentIds.includes(stId)) {
+          setSelectedStudentIds(selectedStudentIds.filter(id => id !== stId));
+        } else {
+          setSelectedStudentIds([...selectedStudentIds, stId]);
+        }
+      };
+
+      const handleBulkToggleRepeater = () => {
+        if (selectedStudentIds.length === 0) return;
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const updatedSts = (g.students || []).map(st => 
+              selectedStudentIds.includes(st.id) ? { ...st, isRepeater: !st.isRepeater } : st
+            );
+            return { ...g, students: updatedSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+        setStudentBatchMsg(`🔄 Estado Repetidor actualizado en lote para ${selectedStudentIds.length} alumno(s).`);
+        setTimeout(() => setStudentBatchMsg(''), 2500);
+      };
+
+      const handleBulkTogglePeilo = () => {
+        if (selectedStudentIds.length === 0) return;
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const updatedSts = (g.students || []).map(st => 
+              selectedStudentIds.includes(st.id) ? { ...st, isPeilo: !st.isPeilo } : st
+            );
+            return { ...g, students: updatedSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+        setStudentBatchMsg(`🗣️ Estado PEILO actualizado en lote para ${selectedStudentIds.length} alumno(s).`);
+        setTimeout(() => setStudentBatchMsg(''), 2500);
+      };
+
+      const handleBulkAddAnnotation = () => {
+        if (selectedStudentIds.length === 0) return;
+        const noteDate = window.prompt('📅 Fecha de la anotación colectiva (AAAA-MM-DD):', new Date().toISOString().split('T')[0]);
+        if (!noteDate) return;
+        const noteContent = window.prompt(`📝 Anotación a aplicar a los ${selectedStudentIds.length} alumnos seleccionados:\n(Ej: Entregó ficha, Falta tarea, Excursión...)`);
+        if (!noteContent || !noteContent.trim()) return;
+
+        const newNoteObj = {
+          id: `stn_${Date.now()}`,
+          date: noteDate.trim(),
+          content: noteContent.trim()
+        };
+
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const updatedSts = (g.students || []).map(st => {
+              if (selectedStudentIds.includes(st.id)) {
+                const currentNotes = Array.isArray(st.studentNotes) ? st.studentNotes : [];
+                return { ...st, studentNotes: [newNoteObj, ...currentNotes] };
+              }
+              return st;
+            });
+            return { ...g, students: updatedSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+        setStudentBatchMsg(`📝 Anotación añadida a los ${selectedStudentIds.length} alumnos seleccionados.`);
+        setTimeout(() => setStudentBatchMsg(''), 2500);
+      };
+
+      const handleBulkUpdateNeae = () => {
+        if (selectedStudentIds.length === 0) return;
+        const val = window.prompt(`🏷️ Texto NEAE / DUA a asignar a los ${selectedStudentIds.length} alumnos seleccionados:`);
+        if (val === null) return;
+
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const updatedSts = (g.students || []).map(st => 
+              selectedStudentIds.includes(st.id) ? { ...st, neae: val.trim() } : st
+            );
+            return { ...g, students: updatedSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+        setStudentBatchMsg(`🏷️ NEAE actualizado para los ${selectedStudentIds.length} alumnos seleccionados.`);
+        setTimeout(() => setStudentBatchMsg(''), 2500);
+      };
+
+      const handleBulkDeleteStudents = () => {
+        if (selectedStudentIds.length === 0) return;
+        if (!window.confirm(`¿Estás seguro/a de que deseas eliminar a los ${selectedStudentIds.length} alumnos seleccionados del grupo?`)) return;
+
+        const updatedGroups = groups.map(g => {
+          if (g.id === activeGroupId) {
+            const filteredSts = (g.students || []).filter(st => !selectedStudentIds.includes(st.id)).map((st, idx) => ({ ...st, number: idx + 1 }));
+            return { ...g, students: filteredSts };
+          }
+          return g;
+        });
+        setGroups(updatedGroups);
+        setSelectedStudentIds([]);
+        setStudentBatchMsg(`🗑️ Se han eliminado los alumnos seleccionados.`);
+        setTimeout(() => setStudentBatchMsg(''), 2500);
+      };
+
+      const handleBulkCopyStudents = () => {
+        if (selectedStudentIds.length === 0) return;
+        const selectedSts = sortedStudents.filter(st => selectedStudentIds.includes(st.id));
+        const formattedList = selectedSts.map(st => `${getStudentDisplayName(st)}${st.isRepeater ? ' [Repetidor]' : ''}${st.isPeilo ? ' [PEILO]' : ''}`).join('\n');
+        
+        try {
+          navigator.clipboard.writeText(formattedList);
+          setStudentBatchMsg(`📋 ¡${selectedSts.length} alumnos copiados al portapapeles!`);
+          setTimeout(() => setStudentBatchMsg(''), 2500);
+        } catch (e) {
+          alert(`Lista de alumnos copiados:\n\n${formattedList}`);
+        }
       };
 
       // --- EXCEL / CSV IMPORT HANDLER ---
@@ -4578,9 +4831,61 @@
               )
             ),
 
+            studentBatchMsg && h('div', {
+              style: {
+                background: '#DCFCE7',
+                color: '#15803D',
+                border: '1px solid #86EFAC',
+                padding: '0.45rem 0.85rem',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                marginBottom: '0.85rem',
+                textAlign: 'center'
+              }
+            }, studentBatchMsg),
+
+            /* BATCH ACTIONS BAR WHEN 1 OR MORE STUDENTS ARE SELECTED */
+            selectedStudentIds.length > 0 && h('div', {
+              style: {
+                background: 'linear-gradient(135deg, #1E2E40 0%, #2D3748 100%)',
+                color: '#FFFFFF',
+                padding: '0.65rem 0.9rem',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                marginBottom: '1rem'
+              }
+            },
+              h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.875rem' } },
+                h('span', null, `⚡ Acciones en Lote (${selectedStudentIds.length} seleccionado${selectedStudentIds.length > 1 ? 's' : ''}):`)
+              ),
+              h('div', { style: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' } },
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkToggleRepeater, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem' } }, '🔄 Repetidor'),
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkTogglePeilo, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem' } }, '🗣️ PEILO'),
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkAddAnnotation, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: '#10B981', borderColor: '#A7F3D0' } }, '📝 Anotación Colectiva'),
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkUpdateNeae, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: '#F59E0B', borderColor: '#FDE68A' } }, '🏷️ NEAE'),
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkCopyStudents, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem' } }, '📋 Copiar Seleccionados'),
+                h('button', { className: 'btn btn-secondary', onClick: handleBulkDeleteStudents, style: { fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: '#EF4444', borderColor: '#FCA5A5' } }, '🗑️ Eliminar (Lote)'),
+                h('button', { className: 'btn btn-outline-white', onClick: () => setSelectedStudentIds([]), style: { fontSize: '0.75rem', padding: '0.2rem 0.45rem' } }, '✕ Cancelar')
+              )
+            ),
+
             sortedStudents.length > 0 ? h('table', { className: 'students-table' },
               h('thead', null,
                 h('tr', null,
+                  h('th', { style: { width: '38px', textAlign: 'center' } },
+                    h('input', {
+                      type: 'checkbox',
+                      checked: sortedStudents.length > 0 && selectedStudentIds.length === sortedStudents.length,
+                      onChange: handleSelectAllStudents,
+                      title: 'Seleccionar / Deseleccionar todos los alumnos'
+                    })
+                  ),
                   h('th', { style: { width: '45px', textAlign: 'center' } }, 'Nº'),
                   h('th', null, 'Apellidos, Nombre del Alumno/a'),
                   h('th', { style: { width: '85px', textAlign: 'center' } }, '🔄 Repetidor'),
@@ -4596,8 +4901,17 @@
                   const notesCount = (st.studentNotes || []).length;
                   const isRepeater = Boolean(st.isRepeater);
                   const isPeilo = Boolean(st.isPeilo);
+                  const isSelected = selectedStudentIds.includes(st.id);
 
-                  return h('tr', { key: st.id, style: { background: isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent') } },
+                  return h('tr', { key: st.id, style: { background: isSelected ? '#FEF3C7' : (isRepeater ? '#FFFBEB' : (isPeilo ? '#FFF7ED' : 'transparent')) } },
+                    h('td', { style: { textAlign: 'center' } },
+                      h('input', {
+                        type: 'checkbox',
+                        checked: isSelected,
+                        onChange: () => handleToggleSelectStudent(st.id),
+                        title: 'Seleccionar este alumno/a para realizar acciones en lote'
+                      })
+                    ),
                     h('td', { style: { fontWeight: 700, color: 'var(--ink-blue)', textAlign: 'center' } }, idx + 1),
                     h('td', null,
                       h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' } },
