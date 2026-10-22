@@ -2088,10 +2088,13 @@
       const completedDays = Math.max(0, totalSchoolDays - remainingSchoolDays);
       const progressPercent = Math.min(100, Math.round((completedDays / totalSchoolDays) * 100));
 
-      const [customStartStr, setCustomStartStr] = useState(nowStr);
+      const customStartStr = data.customCountdownStart || nowStr;
+      const setCustomStartStr = (newStart) => {
+        setData(prev => ({ ...prev, customCountdownStart: newStart }));
+      };
       const customEndStr = data.customCountdownEnd || schoolEndStr;
       const setCustomEndStr = (newEnd) => {
-        setData({ ...data, customCountdownEnd: newEnd });
+        setData(prev => ({ ...prev, customCountdownEnd: newEnd }));
       };
 
       const customTotalSchoolDays = (customStartStr && customEndStr && customStartStr <= customEndStr)
