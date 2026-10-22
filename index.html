@@ -916,6 +916,9 @@
       const rawSched = ensureArray(raw.teacherSchedule);
       const rawCCP = ensureArray(raw.ccpMeetings);
       const rawClaustro = ensureArray(raw.claustroMeetings);
+      const rawOA = ensureArray(raw.oaMeetings);
+      const rawConvivencia = ensureArray(raw.convivenciaMeetings);
+      const rawTaskFlow = ensureArray(raw.taskFlow);
       const rawTemp = ensureArray(raw.temporalizations);
       const rawGroups = ensureArray(raw.groups);
 
@@ -927,6 +930,9 @@
         teacherSchedule: sanitizeTeacherSchedule(rawSched.length > 0 ? rawSched : INITIAL_TEACHER_SCHEDULE),
         ccpMeetings: rawCCP.filter(m => m && typeof m === 'object'),
         claustroMeetings: rawClaustro.filter(m => m && typeof m === 'object'),
+        oaMeetings: rawOA.filter(m => m && typeof m === 'object'),
+        convivenciaMeetings: rawConvivencia.filter(m => m && typeof m === 'object'),
+        taskFlow: rawTaskFlow.filter(t => t && typeof t === 'object'),
         temporalizations: rawTemp.filter(t => t && typeof t === 'object'),
         groups: sanitizeGroups(rawGroups.length > 0 ? rawGroups : INITIAL_GROUPS),
         monthlyEvents: sanitizeMonthlyEvents(raw.monthlyEvents)
@@ -1559,6 +1565,8 @@
           important: true
         }
       ],
+      oaMeetings: [],
+      convivenciaMeetings: [],
       temporalizations: [
         {
           id: 'temp_1',
@@ -1601,6 +1609,7 @@
           createdAt: '2026-09-01'
         }
       ],
+      taskFlow: [],
       groups: INITIAL_GROUPS,
       monthlyEvents: {}
     };
@@ -1955,10 +1964,12 @@
               return h(GroupsView, { groups: data.groups || INITIAL_GROUPS, setGroups: g => setData({...data, groups: g}) });
             case 'notes':
               return h(NotesView, { notes: data.notes || [], setNotes: n => setData({...data, notes: n}) });
+            case 'reuniones':
             case 'ccp':
-              return h(CCPView, { meetings: data.ccpMeetings || [], setMeetings: m => setData({...data, ccpMeetings: m}) });
             case 'claustro':
-              return h(ClaustroView, { meetings: data.claustroMeetings || [], setMeetings: m => setData({...data, claustroMeetings: m}) });
+              return h(MeetingsView, { data, setData });
+            case 'taskFlow':
+              return h(TaskFlowView, { tasks: data.taskFlow || [], setTasks: t => setData({...data, taskFlow: t}) });
             case 'monthly':
               return h(MonthlyPlanningView, { data, setData });
             case 'temporalizaciones':
@@ -1984,8 +1995,8 @@
         { id: 'weekly', label: 'Planificador Semanal', icon: '⏰' },
         { id: 'groups', label: 'Grupos', icon: '🏫', badge: (data.groups || INITIAL_GROUPS).length },
         { id: 'notes', label: 'Notas Docentes', icon: '📝', badge: (data.notes || []).length },
-        { id: 'ccp', label: 'Reuniones CCP', icon: '👥', badge: (data.ccpMeetings || []).length },
-        { id: 'claustro', label: 'Reuniones CLAUSTRO', icon: '🎓', badge: (data.claustroMeetings || []).length },
+        { id: 'reuniones', label: 'Reuniones', icon: '👥', badge: ((data.ccpMeetings || []).length + (data.claustroMeetings || []).length + (data.oaMeetings || []).length + (data.convivenciaMeetings || []).length) },
+        { id: 'taskFlow', label: 'Flujo de tareas', icon: '☑️', badge: (data.taskFlow || []).filter(t => t && !t.completed).length },
         { id: 'temporalizaciones', label: 'Temporalizaciones', icon: '⏱️', badge: (data.temporalizations || []).length }
       ];
 
@@ -2077,6 +2088,31 @@
       const completedDays = Math.max(0, totalSchoolDays - remainingSchoolDays);
       const progressPercent = Math.min(100, Math.round((completedDays / totalSchoolDays) * 100));
 
+      const [customStartStr, setCustomStartStr] = useState(nowStr);
+      const customEndStr = data.customCountdownEnd || schoolEndStr;
+      const setCustomEndStr = (newEnd) => {
+        setData({ ...data, customCountdownEnd: newEnd });
+      };
+
+      const customTotalSchoolDays = (customStartStr && customEndStr && customStartStr <= customEndStr)
+        ? calculateSchoolDays(customStartStr, customEndStr, data.calendarEvents || [])
+        : 0;
+
+      let customRemainingSchoolDays = 0;
+      if (customStartStr && customEndStr && customStartStr <= customEndStr) {
+        if (nowStr > customEndStr) {
+          customRemainingSchoolDays = 0;
+        } else if (nowStr <= customStartStr) {
+          customRemainingSchoolDays = customTotalSchoolDays;
+        } else {
+          customRemainingSchoolDays = calculateSchoolDays(nowStr, customEndStr, data.calendarEvents || []);
+        }
+      }
+      const customCompletedDays = Math.max(0, customTotalSchoolDays - customRemainingSchoolDays);
+      const customProgressPercent = customTotalSchoolDays > 0
+        ? Math.min(100, Math.round((customCompletedDays / customTotalSchoolDays) * 100))
+        : 0;
+
       const dayNames = ['domingo', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'sábado'];
       const dayNameCapitalized = today.toLocaleDateString('es-ES', { weekday: 'long' });
       const dateFormattedDDMMYYYY = formatDateDDMMYYYY(today);
@@ -2167,145 +2203,9 @@
             h('strong', { style: { color: 'var(--ink-blue)', textTransform: 'capitalize' } }, dayNameEs)
           )
         ),
-        h('div', { className: 'home-dashboard-layout', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: '1.15rem', alignItems: 'start' } },
-          /* COLUMN 1 (LEFT): PROGRAMACIÓN DE HOY + PRÓXIMAMENTE */
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-            /* CARD 1: PROGRAMACIÓN DE HOY */
-            h('div', { className: 'card', style: { borderLeft: '4px solid var(--ink-blue)', padding: '1rem 1.15rem' } },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' } },
-                h('span', { className: 'badge badge-ink', style: { fontSize: '0.7rem' } }, '📌 PROGRAMACIÓN DE HOY'),
-                h('span', { style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }, 'Horario Escolar')
-              ),
-              (() => {
-                const teacherSched = data.teacherSchedule || INITIAL_TEACHER_SCHEDULE;
-                const timeSlotsToday = getTimeSlotsForDay(currentDayKey);
-                
-                const now = new Date();
-                const nowTotalMins = now.getHours() * 60 + now.getMinutes();
-
-                const todayCombined = timeSlotsToday.map(slot => {
-                  const item = todaySlots[slot.time] || {};
-                  const official = getScheduleActivity(teacherSched, currentDayKey, slot.time);
-                  
-                  const times = (slot.time || '').split('-').map(s => s.trim());
-                  const [sH, sM] = (times[0] || '08:00').split(':').map(Number);
-                  const [eH, eM] = (times[1] || times[0] || '08:55').split(':').map(Number);
-                  const startMins = sH * 60 + sM;
-                  const endMins = eH * 60 + eM;
-
-                  let status = 'future';
-                  if (nowTotalMins > endMins) status = 'past';
-                  else if (nowTotalMins >= startMins && nowTotalMins <= endMins) status = 'current';
-
-                  return { slot, item, official, status, startMins, endMins };
-                }).filter(x => x.official || x.item.subject || (ensureArray(x.item.blocks).length > 0));
-
-                const activeOrFuture = todayCombined.filter(x => x.status !== 'past');
-                const pastSlots = todayCombined.filter(x => x.status === 'past');
-                const sortedCombined = [...activeOrFuture, ...pastSlots];
-
-                return sortedCombined.length > 0 ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto' } },
-                  sortedCombined.map(({ slot, item, official, status }) => {
-                    const blocks = ensureArray(item.blocks);
-                    const badgeStyle = getSlotBadgeStyle(official);
-
-                    const isCurrent = status === 'current';
-                    const isPast = status === 'past';
-
-                    return h('div', {
-                      key: slot.time,
-                      style: {
-                        background: isCurrent ? '#EFF6FF' : (isPast ? '#F8FAFC' : 'var(--bg-card-subtle)'),
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: 'var(--radius-md)',
-                        border: isCurrent ? '2px solid #3B82F6' : (isPast ? '1px dashed #CBD5E1' : '1px solid var(--border-subtle)'),
-                        fontSize: '0.8rem',
-                        opacity: isPast ? 0.65 : 1,
-                        boxShadow: isCurrent ? '0 2px 8px rgba(59, 130, 246, 0.15)' : 'none',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'anywhere',
-                        whiteSpace: 'pre-wrap'
-                      }
-                    },
-                      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: 'var(--ink-blue)', marginBottom: '0.2rem' } },
-                        h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.35rem' } },
-                          h('span', null, slot.time),
-                          isCurrent && h('span', { className: 'badge', style: { background: '#EF4444', color: '#FFFFFF', fontSize: '0.65rem', padding: '0.1rem 0.35rem' } }, '🔴 EN CURSO'),
-                          isPast && h('span', { className: 'badge', style: { background: '#E2E8F0', color: '#64748B', fontSize: '0.65rem', padding: '0.1rem 0.35rem' } }, '✓ Finalizada')
-                        ),
-                        official ? h('span', { style: { padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.725rem', ...badgeStyle } }, formatPlannerText(official)) : (item.subject ? h('span', { style: { color: 'var(--gold-accent)' } }, `${item.subject} (${item.group || ''})`) : null)
-                      ),
-
-                      blocks.length > 0 ? h('div', { style: { marginTop: '0.3rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' } },
-                        blocks.map((blk, bIdx) => {
-                          const lessonObj = LESSON_TYPES.find(l => l.key === blk.type);
-                          return h('div', {
-                            key: bIdx,
-                            style: {
-                              display: 'flex',
-                              gap: '0.35rem',
-                              alignItems: 'flex-start',
-                              fontSize: '0.8rem',
-                              lineHeight: 1.35,
-                              wordBreak: 'break-word',
-                              overflowWrap: 'anywhere',
-                              whiteSpace: 'pre-wrap'
-                            }
-                          },
-                            lessonObj && lessonObj.colorClass && h('span', { className: `lesson-badge ${lessonObj.colorClass}`, style: { fontSize: '0.65rem', flexShrink: 0, marginTop: '0.1rem' } }, lessonObj.label),
-                            h('span', { style: { color: 'var(--text-secondary)', fontWeight: 600, flex: 1, wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' } }, renderTextWithLinks(blk.text))
-                          );
-                        })
-                      ) : (official ? h('div', { style: { fontSize: '0.725rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '0.15rem' } }, 'Sin bloques específicos de aula') : null)
-                    );
-                  })
-                ) : h('div', { style: { textAlign: 'center', padding: '1rem 0.5rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)' } },
-                  h('p', { style: { fontSize: '0.85rem' } }, '📖 No hay clases programadas para hoy.')
-                );
-              })(),
-              h('div', { style: { marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.775rem' } },
-                h('span', { style: { color: 'var(--text-muted)' } }, `${todaySlotKeys.length} franjas ocupadas`),
-                h('button', { onClick: () => setCurrentSection('weekly'), style: { background: 'none', border: 'none', color: 'var(--gold-accent)', fontWeight: 600, cursor: 'pointer' } }, 'Ver semana →')
-              )
-            )
-          ),
-
-          /* COLUMN 2 (RIGHT): CUENTA ATRÁS LECTIVA + MES EN CURSO DE LA PLANIFICACIÓN MENSUAL */
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-            /* CARD 2: CUENTA ATRÁS LECTIVA */
-            h('div', { className: 'card', style: { borderLeft: '4px solid var(--burgundy)', padding: '0.85rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, var(--burgundy-light) 100%)', height: 'fit-content' } },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' } },
-                h('span', { className: 'badge badge-burgundy', style: { fontSize: '0.7rem' } }, '⏳ CUENTA ATRÁS LECTIVA'),
-                h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, '2026/2027')
-              ),
-              h('h3', { style: { fontSize: '1rem', color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
-                `Días Lectivos (${formatDateDDMMYYYY('2026-09-09')} a ${formatDateDDMMYYYY('2027-06-18')})`
-              ),
-              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '0.5rem 0' } },
-                h('div', { style: { background: '#FFFFFF', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
-                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--burgundy)', lineHeight: 1.1 } }, remainingSchoolDays),
-                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Restantes')
-                ),
-                h('div', { style: { background: '#FFFFFF', padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
-                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--ink-blue)', lineHeight: 1.1 } }, totalSchoolDays),
-                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Total Curso')
-                )
-              ),
-              h('div', null,
-                h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.725rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' } },
-                  h('span', null, 'Progreso Curso'),
-                  h('strong', null, `${progressPercent}% completado`)
-                ),
-                h('div', { style: { width: '100%', height: '7px', background: 'rgba(122, 38, 56, 0.15)', borderRadius: '4px', overflow: 'hidden' } },
-                  h('div', { style: { width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold-accent), var(--burgundy))' } })
-                ),
-                daysUntilStart > 0 && h('div', { style: { marginTop: '0.35rem', fontSize: '0.725rem', color: 'var(--forest-green)', fontWeight: 600, textAlign: 'center' } },
-                  `🌱 ¡Faltan ${daysUntilStart} días para el ${formatDateDDMMYYYY('2026-09-09')}!`
-                )
-              )
-            ),
-
-            /* CARD 3: PLANIFICACIÓN MENSUAL CON NAVEGACIÓN DE MESES */
+        h('div', { className: 'home-dashboard-layout', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: '1.15rem', alignItems: 'stretch' } },
+          /* COLUMN 1 (LEFT): MES EN CURSO DE LA PLANIFICACIÓN MENSUAL */
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem', height: '100%' } },
             (() => {
               const allSchoolMonths = getReorderedSchoolMonths();
               const safeMonthIdx = Math.max(0, Math.min(allSchoolMonths.length - 1, homeMonthIndex));
@@ -2347,7 +2247,7 @@
                 });
               }
 
-              return h('div', { className: 'card', style: { padding: '1rem 1.15rem' } },
+              return h('div', { className: 'card', style: { padding: '1rem 1.15rem', flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
                 h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem', flexWrap: 'wrap' } },
                   h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.2rem' } },
                     h('span', { className: 'badge badge-gold', style: { fontSize: '0.65rem', display: 'inline-block', width: 'fit-content' } },
@@ -2463,7 +2363,9 @@
                           dayEvents.map((mEvt, mIdx) => {
                             const courseLabel = mEvt.subtag ? mEvt.subtag : (getMonthlyTagLabel(mEvt.tag) || mEvt.text || 'Evento');
                             const fullTitle = `${mEvt.subtag ? `[${mEvt.subtag}] ` : ''}${mEvt.time ? `${mEvt.time} ` : ''}${mEvt.text || ''}`;
-                            const bgShade = mEvt.subtag ? getGroupBlackShade(mEvt.subtag) : 'var(--gold-accent)';
+                            const courseStyle = mEvt.subtag
+                              ? getGroupBadgeStyle(mEvt.subtag)
+                              : { background: 'var(--gold-accent)', color: '#FFFFFF', border: 'none' };
                             return h('span', {
                               key: mEvt.id || mIdx,
                               title: fullTitle,
@@ -2472,8 +2374,7 @@
                                 fontWeight: 700,
                                 padding: '0.08rem 0.3rem',
                                 borderRadius: '3px',
-                                background: bgShade,
-                                color: '#FFFFFF',
+                                ...courseStyle,
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -2489,6 +2390,99 @@
                 )
               );
             })()
+          ),
+
+          /* COLUMN 2 (RIGHT): LAS DOS CUENTAS ATRÁS LECTIVAS */
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem', height: '100%' } },
+            /* CARD 1: CUENTA ATRÁS LECTIVA (CURSO COMPLETO) */
+            h('div', { className: 'card', style: { borderLeft: '4px solid var(--burgundy)', padding: '1rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, var(--burgundy-light) 100%)', flex: '1 1 0%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' } },
+                h('span', { className: 'badge badge-burgundy', style: { fontSize: '0.7rem' } }, '⏳ CUENTA ATRÁS LECTIVA'),
+                h('span', { className: 'badge badge-gold', style: { fontSize: '0.7rem' } }, '2026/2027')
+              ),
+              h('h3', { style: { fontSize: '1rem', color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
+                `Días Lectivos (${formatDateDDMMYYYY('2026-09-09')} a ${formatDateDDMMYYYY('2027-06-18')})`
+              ),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', margin: '0.45rem 0' } },
+                h('div', { style: { background: '#FFFFFF', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.45rem', fontWeight: 700, color: 'var(--burgundy)', lineHeight: 1.1 } }, remainingSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Restantes')
+                ),
+                h('div', { style: { background: '#FFFFFF', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.45rem', fontWeight: 700, color: 'var(--ink-blue)', lineHeight: 1.1 } }, totalSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Total Curso')
+                )
+              ),
+              h('div', null,
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.725rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' } },
+                  h('span', null, 'Progreso Curso'),
+                  h('strong', null, `${progressPercent}% completado`)
+                ),
+                h('div', { style: { width: '100%', height: '7px', background: 'rgba(122, 38, 56, 0.15)', borderRadius: '4px', overflow: 'hidden' } },
+                  h('div', { style: { width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold-accent), var(--burgundy))' } })
+                ),
+                daysUntilStart > 0 && h('div', { style: { marginTop: '0.35rem', fontSize: '0.725rem', color: 'var(--forest-green)', fontWeight: 600, textAlign: 'center' } },
+                  `🌱 ¡Faltan ${daysUntilStart} días para el ${formatDateDDMMYYYY('2026-09-09')}!`
+                )
+              )
+            ),
+
+            /* CARD 2: CUENTA ATRÁS LECTIVA PERSONALIZABLE (FECHAS MODIFICABLES) */
+            h('div', { className: 'card', style: { borderLeft: '4px solid var(--forest-green)', padding: '1rem 1.15rem', background: 'linear-gradient(135deg, #FFFFFF 0%, #F0FDF4 100%)', flex: '1 1 0%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', gap: '0.4rem', flexWrap: 'wrap' } },
+                h('span', { className: 'badge', style: { fontSize: '0.7rem', background: '#DCFCE7', color: '#15803D', border: '1px solid #86EFAC', fontWeight: 700 } }, '⏳ CUENTA ATRÁS LECTIVA PERSONALIZADA'),
+                customStartStr !== nowStr && h('button', {
+                  type: 'button',
+                  className: 'btn btn-secondary',
+                  onClick: () => setCustomStartStr(nowStr),
+                  style: { padding: '0.12rem 0.45rem', fontSize: '0.68rem', fontWeight: 700 }
+                }, '↺ Iniciar Hoy')
+              ),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.35rem' } },
+                h('div', null,
+                  h('label', { style: { display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.15rem', textTransform: 'uppercase' } }, 'Fecha de inicio'),
+                  h('input', {
+                    type: 'date',
+                    className: 'form-control',
+                    value: customStartStr,
+                    onChange: e => setCustomStartStr(e.target.value || nowStr),
+                    style: { padding: '0.28rem 0.45rem', fontSize: '0.78rem', fontWeight: 600, background: '#FFFFFF' }
+                  })
+                ),
+                h('div', null,
+                  h('label', { style: { display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.15rem', textTransform: 'uppercase' } }, 'Fecha de fin'),
+                  h('input', {
+                    type: 'date',
+                    className: 'form-control',
+                    value: customEndStr,
+                    onChange: e => setCustomEndStr(e.target.value || schoolEndStr),
+                    style: { padding: '0.28rem 0.45rem', fontSize: '0.78rem', fontWeight: 600, background: '#FFFFFF' }
+                  })
+                )
+              ),
+              h('h3', { style: { fontSize: '0.92rem', color: 'var(--ink-blue)', marginBottom: '0.15rem' } },
+                `Días Lectivos (${formatDateDDMMYYYY(customStartStr)} a ${formatDateDDMMYYYY(customEndStr)})`
+              ),
+              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', margin: '0.35rem 0' } },
+                h('div', { style: { background: '#FFFFFF', padding: '0.5rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--forest-green)', lineHeight: 1.1 } }, customRemainingSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Restantes')
+                ),
+                h('div', { style: { background: '#FFFFFF', padding: '0.5rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' } },
+                  h('div', { style: { fontSize: '1.35rem', fontWeight: 700, color: 'var(--ink-blue)', lineHeight: 1.1 } }, customTotalSchoolDays),
+                  h('div', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 } }, 'Total Periodo')
+                )
+              ),
+              h('div', null,
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.725rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' } },
+                  h('span', null, 'Progreso Periodo'),
+                  h('strong', null, `${customProgressPercent}% completado`)
+                ),
+                h('div', { style: { width: '100%', height: '7px', background: 'rgba(46, 90, 68, 0.15)', borderRadius: '4px', overflow: 'hidden' } },
+                  h('div', { style: { width: `${customProgressPercent}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold-accent), var(--forest-green))' } })
+                )
+              )
+            )
           )
         ),
         selectedDateForNotes && h(DayMonthlyEventsModal, {
@@ -6162,8 +6156,88 @@
       );
     }
 
-    // --- REUNIONES CCP ---
-    function CCPView({ meetings, setMeetings }) {
+    // --- REUNIONES (UNIFICADO: CCP, CLAUSTRO, OA CONFLICTES, COMISIÓN DE CONVIVENCIA) ---
+    const MEETING_CATEGORIES = [
+      {
+        id: 'ccp',
+        label: 'CCP',
+        icon: '👥',
+        fullTitle: 'Comisión de Coordinación Pedagógica (CCP)',
+        subtitle: 'Comisión de Coordinación Pedagógica — Actas, notas y acuerdos',
+        dataKey: 'ccpMeetings',
+        defaultTitlePrefix: 'Reunión CCP',
+        defaultTime: '16:00',
+        addBtnLabel: '+ Nueva Nota CCP',
+        accentColor: '#B45309',
+        borderLeftColor: 'var(--gold-accent)',
+        badgeBg: '#FEF3C7',
+        badgeText: '#92400E',
+        badgeBorder: '#F59E0B',
+        activeTabBg: '#FEF3C7',
+        activeTabText: '#78350F',
+        activeTabBorder: '#D97706'
+      },
+      {
+        id: 'claustro',
+        label: 'Claustro',
+        icon: '🎓',
+        fullTitle: 'Claustro de Profesorado',
+        subtitle: 'Sesiones oficiales del Claustro de Profesorado — Actas, notas y acuerdos',
+        dataKey: 'claustroMeetings',
+        defaultTitlePrefix: 'Claustro',
+        defaultTime: '17:00',
+        addBtnLabel: '+ Nueva Nota Claustro',
+        accentColor: '#1E2E40',
+        borderLeftColor: 'var(--ink-blue)',
+        badgeBg: '#E2E8F0',
+        badgeText: '#1E293B',
+        badgeBorder: '#94A3B8',
+        activeTabBg: '#1E2E40',
+        activeTabText: '#FFFFFF',
+        activeTabBorder: '#1E2E40'
+      },
+      {
+        id: 'oa',
+        label: 'OA Conflictes',
+        icon: '🤝',
+        fullTitle: 'OA Conflictes',
+        subtitle: 'Reuniones de OA Conflictes — Actas, notas, seguimiento y acuerdos',
+        dataKey: 'oaMeetings',
+        defaultTitlePrefix: 'Reunión OA Conflictes',
+        defaultTime: '11:30',
+        addBtnLabel: '+ Nueva Nota OA Conflictes',
+        accentColor: '#6B21A8',
+        borderLeftColor: '#9333EA',
+        badgeBg: '#F3E8FF',
+        badgeText: '#6B21A8',
+        badgeBorder: '#C084FC',
+        activeTabBg: '#F3E8FF',
+        activeTabText: '#581C87',
+        activeTabBorder: '#9333EA'
+      },
+      {
+        id: 'convivencia',
+        label: 'Comisión de convivencia',
+        icon: '⚖️',
+        fullTitle: 'Comisión de Convivencia',
+        subtitle: 'Sesiones de la Comisión de Convivencia — Actas, notas y acuerdos',
+        dataKey: 'convivenciaMeetings',
+        defaultTitlePrefix: 'Comisión de Convivencia',
+        defaultTime: '12:00',
+        addBtnLabel: '+ Nueva Nota Convivencia',
+        accentColor: '#0E7490',
+        borderLeftColor: '#0891B2',
+        badgeBg: '#CFFAFE',
+        badgeText: '#155E75',
+        badgeBorder: '#22D3EE',
+        activeTabBg: '#CFFAFE',
+        activeTabText: '#164E63',
+        activeTabBorder: '#0891B2'
+      }
+    ];
+
+    function MeetingsView({ data, setData }) {
+      const [activeSubgroup, setActiveSubgroup] = useState('ccp');
       const [showAdd, setShowAdd] = useState(false);
       const [sortBy, setSortBy] = useState('manual');
       const [editingMeeting, setEditingMeeting] = useState(null);
@@ -6171,6 +6245,16 @@
 
       const [draggedId, setDraggedId] = useState(null);
       const [dragOverId, setDragOverId] = useState(null);
+
+      const currentCategory = MEETING_CATEGORIES.find(c => c.id === activeSubgroup) || MEETING_CATEGORIES[0];
+      const meetings = ensureArray(data[currentCategory.dataKey]).filter(m => m && typeof m === 'object');
+
+      const setMeetings = (updatedList) => {
+        setData({
+          ...data,
+          [currentCategory.dataKey]: updatedList
+        });
+      };
 
       const handleDragStart = (e, id) => {
         e.dataTransfer.setData('text/plain', String(id));
@@ -6209,30 +6293,52 @@
       };
 
       const handleOpenAdd = () => {
-        setFormData({ title: `Reunión CCP nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '16:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
+        setFormData({
+          title: `${currentCategory.defaultTitlePrefix} nº ${meetings.length + 1}`,
+          date: new Date().toISOString().split('T')[0],
+          time: currentCategory.defaultTime,
+          agenda: '1. \n2. \n3. ',
+          agreements: '',
+          notes: '',
+          important: false
+        });
         setEditingMeeting(null);
         setShowAdd(true);
       };
 
       const handleOpenEdit = (m) => {
-        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], time: m.time || '', agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
+        setFormData({
+          title: m.title || '',
+          date: m.date || new Date().toISOString().split('T')[0],
+          time: m.time || '',
+          agenda: m.agenda || '',
+          agreements: m.agreements || '',
+          notes: m.notes || '',
+          important: Boolean(m.important)
+        });
         setEditingMeeting(m);
         setShowAdd(true);
       };
 
       const handleSave = (e) => {
         e.preventDefault();
-        if (editingMeeting) setMeetings(meetings.map(m => m.id === editingMeeting.id ? { ...m, ...formData } : m));
-        else setMeetings([{ id: `ccp_${Date.now()}`, ...formData }, ...meetings]);
+        if (editingMeeting) {
+          setMeetings(meetings.map(m => m.id === editingMeeting.id ? { ...m, ...formData } : m));
+        } else {
+          setMeetings([{ id: `${currentCategory.id}_${Date.now()}`, ...formData }, ...meetings]);
+        }
         setShowAdd(false);
       };
 
       const handleDelete = (id) => {
-        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de CCP?')) {
+        if (window.confirm(`¿Estás seguro/a de que deseas eliminar esta nota de ${currentCategory.label}?`)) {
           setMeetings(meetings.filter(m => m.id !== id));
         }
       };
-      const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
+
+      const handleToggleImportant = (id) => {
+        setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
+      };
 
       const handleMoveUp = (id) => {
         const idx = meetings.findIndex(m => m.id === id);
@@ -6261,21 +6367,104 @@
       });
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.25rem' } },
+        /* HEADER */
         h('div', { className: 'section-header' },
           h('div', null,
-            h('h2', { className: 'section-title' }, 'Reuniones CCP'),
-            h('p', { className: 'section-subtitle' }, 'Comisión de Coordinación Pedagógica — Actas y acuerdos')
+            h('h2', { className: 'section-title' }, '👥 Reuniones'),
+            h('p', { className: 'section-subtitle' }, currentCategory.subtitle)
           ),
           h('div', { style: { display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' } },
-            h('select', { className: 'form-control', style: { width: '220px', fontWeight: 600, padding: '0.45rem 0.65rem', background: '#FDF9F0', borderColor: 'var(--gold-accent)' }, value: sortBy, onChange: e => setSortBy(e.target.value) },
+            h('select', {
+              className: 'form-control',
+              style: { width: '220px', fontWeight: 600, padding: '0.45rem 0.65rem', background: '#FDF9F0', borderColor: 'var(--gold-accent)' },
+              value: sortBy,
+              onChange: e => setSortBy(e.target.value)
+            },
               h('option', { value: 'manual' }, '↕️ Ordenación: Manual'),
               h('option', { value: 'dateDesc' }, '📅 Reunión: Recientes Primero'),
               h('option', { value: 'dateAsc' }, '📅 Reunión: Antiguas Primero')
             ),
-            h('button', { className: 'btn btn-gold', onClick: handleOpenAdd, style: { padding: '0.5rem 1.1rem', fontSize: '0.9rem' } }, '+ CCP')
+            h('button', {
+              className: 'btn btn-gold',
+              onClick: handleOpenAdd,
+              style: { padding: '0.5rem 1.1rem', fontSize: '0.9rem' }
+            }, currentCategory.addBtnLabel)
           )
         ),
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
+
+        /* SUBGROUP TAGS BAR (CCP, Claustro, OA Conflictes, Comisión de convivencia) */
+        h('div', {
+          className: 'card',
+          style: {
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            gap: '0.65rem',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            background: '#FFFFFF',
+            border: '1px solid var(--border-color)'
+          }
+        },
+          h('span', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Subgrupos:'),
+          MEETING_CATEGORIES.map(cat => {
+            const isSelected = cat.id === activeSubgroup;
+            const count = ensureArray(data[cat.dataKey]).filter(m => m && typeof m === 'object').length;
+            return h('button', {
+              key: cat.id,
+              type: 'button',
+              onClick: () => {
+                setActiveSubgroup(cat.id);
+                setShowAdd(false);
+                setEditingMeeting(null);
+              },
+              style: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 0.95rem',
+                borderRadius: '999px',
+                fontSize: '0.875rem',
+                fontWeight: isSelected ? 800 : 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                background: isSelected ? cat.activeTabBg : 'var(--bg-card-subtle)',
+                color: isSelected ? cat.activeTabText : 'var(--text-secondary)',
+                border: isSelected ? `2px solid ${cat.activeTabBorder}` : '1px solid var(--border-subtle)',
+                boxShadow: isSelected ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none'
+              }
+            },
+              h('span', null, cat.icon),
+              h('span', null, cat.label),
+              h('span', {
+                style: {
+                  background: isSelected ? 'rgba(255, 255, 255, 0.28)' : '#E2E8F0',
+                  color: isSelected ? cat.activeTabText : '#475569',
+                  border: isSelected ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                  borderRadius: '999px',
+                  padding: '0.05rem 0.45rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 800
+                }
+              }, count)
+            );
+          })
+        ),
+
+        /* MEETINGS LIST FOR ACTIVE SUBGROUP */
+        sortedMeetings.length === 0 ? h('div', {
+          className: 'card',
+          style: {
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            background: '#FFFFFF',
+            border: '1px dashed var(--border-color)'
+          }
+        },
+          h('div', { style: { fontSize: '2rem', marginBottom: '0.5rem' } }, currentCategory.icon),
+          h('h3', { style: { fontSize: '1.15rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, `No hay notas registradas en ${currentCategory.label}`),
+          h('p', { style: { fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1rem' } }, `Crea la primera acta o nota para el subgrupo «${currentCategory.fullTitle}».`),
+          h('button', { className: 'btn btn-gold', onClick: handleOpenAdd }, currentCategory.addBtnLabel)
+        ) : h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
           sortedMeetings.map(m => {
             const isDraggingThis = draggedId === m.id;
             const isOverThis = dragOverId === m.id;
@@ -6287,7 +6476,7 @@
               onDrop: (e) => handleDrop(e, m.id),
               onDragEnd: handleDragEnd,
               style: {
-                borderLeft: '6px solid var(--gold-accent)',
+                borderLeft: `6px solid ${currentCategory.borderLeftColor}`,
                 padding: '1.25rem',
                 background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
                 border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
@@ -6295,18 +6484,27 @@
                 transition: 'all 0.15s ease'
               }
             },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '0.5rem' } },
                 h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
                   h('span', {
                     draggable: true,
                     onDragStart: (e) => handleDragStart(e, m.id),
                     style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
-                    title: 'Arrastra este icono ✋ para reordenar esta acta CCP'
+                    title: `Arrastra este icono ✋ para reordenar esta nota de ${currentCategory.label}`
                   }, '✋'),
+                  h('span', {
+                    className: 'badge',
+                    style: {
+                      background: currentCategory.badgeBg,
+                      color: currentCategory.badgeText,
+                      border: `1px solid ${currentCategory.badgeBorder}`,
+                      fontWeight: 700
+                    }
+                  }, `${currentCategory.icon} ${currentCategory.label}`),
                   h('span', { className: 'badge badge-gold' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
                   m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
                 ),
-                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
+                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' } },
                   h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
                   sortBy === 'manual' && h(React.Fragment, null,
                     h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
@@ -6339,10 +6537,16 @@
             );
           })
         ),
+
+        /* ADD / EDIT MODAL FOR ACTIVE SUBGROUP */
         showAdd && h('div', { className: 'modal-overlay' },
           h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
             h('div', { className: 'modal-header' },
-              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento CCP' : 'Nuevo Documento de Reunión CCP (+ CCP)'),
+              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } },
+                editingMeeting
+                  ? `Editar Nota — ${currentCategory.fullTitle}`
+                  : `Nueva Nota de Reunión — ${currentCategory.fullTitle}`
+              ),
               h('button', { onClick: () => setShowAdd(false) }, '✕')
             ),
             h('form', { onSubmit: handleSave },
@@ -6374,13 +6578,13 @@
                   h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
                 ),
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
-                  h('input', { type: 'checkbox', id: 'chk_important', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
-                  h('label', { htmlFor: 'chk_important', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '⭐ Marcar este documento como Importante')
+                  h('input', { type: 'checkbox', id: 'chk_important_meeting', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
+                  h('label', { htmlFor: 'chk_important_meeting', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '⭐ Marcar este documento como Importante')
                 )
               ),
               h('div', { className: 'modal-footer' },
                 h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setShowAdd(false) }, 'Cancelar'),
-                h('button', { type: 'submit', className: 'btn btn-gold' }, 'Guardar Documento CCP')
+                h('button', { type: 'submit', className: 'btn btn-gold' }, `Guardar en ${currentCategory.label}`)
               )
             )
           )
@@ -6388,15 +6592,135 @@
       );
     }
 
-    // --- REUNIONES CLAUSTRO ---
-    function ClaustroView({ meetings, setMeetings }) {
-      const [showAdd, setShowAdd] = useState(false);
-      const [sortBy, setSortBy] = useState('manual');
-      const [editingMeeting, setEditingMeeting] = useState(null);
-      const [formData, setFormData] = useState({ title: '', date: new Date().toISOString().split('T')[0], time: '', agenda: '', agreements: '', notes: '', important: false });
+    // --- FLUJO DE TAREAS (LISTADO DE TAREAS PENDIENTES) ---
+    function TaskFlowView({ tasks: rawTasks = [], setTasks }) {
+      const tasks = ensureArray(rawTasks).filter(t => t && typeof t === 'object');
+      const courses = ['4A', '4C', 'BAT1', 'LU', 'OTROS'];
+
+      const todayStr = () => new Date().toISOString().split('T')[0];
+
+      const [newCourse, setNewCourse] = useState('4A');
+      const [newDate, setNewDate] = useState(todayStr);
+      const [newSubject, setNewSubject] = useState('');
+
+      const [sortBy, setSortBy] = useState('createdAt'); // 'createdAt' | 'manual'
+      const [filterCourse, setFilterCourse] = useState('TODOS');
+      const [searchQuery, setSearchQuery] = useState('');
 
       const [draggedId, setDraggedId] = useState(null);
       const [dragOverId, setDragOverId] = useState(null);
+
+      const normalizeCourse = (c) => {
+        if (!c) return 'OTROS';
+        const up = String(c).trim().toUpperCase();
+        if (up === '4ª' || up === '4ºA' || up === '4ESO A') return '4A';
+        if (up === '4ºC' || up === '4ESO C') return '4C';
+        if (courses.includes(up)) return up;
+        return 'OTROS';
+      };
+
+      const getCourseBadgeStyle = (c) => {
+        const norm = normalizeCourse(c);
+        if (norm === '4A') return { background: '#FCE7F3', color: '#9D174D', border: '1px solid #F472B6' };
+        if (norm === '4C') return { background: '#FEF9C3', color: '#854D0E', border: '1px solid #FACC15' };
+        if (norm === 'BAT1') return { background: '#CFFAFE', color: '#0E7490', border: '1px solid #06B6D4' };
+        if (norm === 'LU') return { background: '#DCFCE7', color: '#15803D', border: '1px solid #4ADE80' };
+        return { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FB923C' }; // OTROS
+      };
+
+      const handleAddTask = (e) => {
+        e.preventDefault();
+        if (!newSubject.trim()) return;
+        const now = Date.now();
+        const newTask = {
+          id: `task_${now}_${Math.floor(Math.random() * 1000)}`,
+          course: normalizeCourse(newCourse),
+          date: newDate || todayStr(),
+          subject: newSubject.trim(),
+          completed: false,
+          createdAt: now,
+          completedAt: null
+        };
+        // Insert before completed tasks so pending tasks stay together and completed remain at the end
+        const pendingList = tasks.filter(t => !t.completed);
+        const completedList = tasks.filter(t => Boolean(t.completed));
+        setTasks([...pendingList, newTask, ...completedList]);
+        setNewSubject('');
+        setNewDate(todayStr());
+      };
+
+      const handleToggleComplete = (taskId) => {
+        const target = tasks.find(t => t.id === taskId);
+        if (!target) return;
+        const nextCompleted = !target.completed;
+        const updatedTask = {
+          ...target,
+          completed: nextCompleted,
+          completedAt: nextCompleted ? Date.now() : null
+        };
+        const remaining = tasks.filter(t => t.id !== taskId);
+        const pendingList = remaining.filter(t => !t.completed);
+        const completedList = remaining.filter(t => Boolean(t.completed));
+
+        // When marked as completed, automatically strike through and move to the end of the list
+        if (nextCompleted) {
+          setTasks([...pendingList, ...completedList, updatedTask]);
+        } else {
+          setTasks([...pendingList, updatedTask, ...completedList]);
+        }
+      };
+
+      const handleUpdateTaskField = (taskId, field, value) => {
+        setTasks(tasks.map(t => t.id === taskId ? { ...t, [field]: value } : t));
+      };
+
+      const handleDeleteTask = (taskId) => {
+        if (!window.confirm('¿Estás seguro/a de que deseas eliminar esta tarea?')) return;
+        setTasks(tasks.filter(t => t.id !== taskId));
+      };
+
+      const handleClearCompleted = () => {
+        const completedCount = tasks.filter(t => t.completed).length;
+        if (completedCount === 0) return;
+        if (!window.confirm(`¿Deseas eliminar todas las tareas realizadas (${completedCount})?`)) return;
+        setTasks(tasks.filter(t => !t.completed));
+      };
+
+      // Helper to get current displayed order before moving manually
+      const getOrderedTasks = (mode = sortBy) => {
+        return [...tasks].sort((a, b) => {
+          const aComp = Boolean(a.completed);
+          const bComp = Boolean(b.completed);
+          // Completed tasks ALWAYS go to the end of the list
+          if (aComp !== bComp) return aComp ? 1 : -1;
+
+          if (mode === 'createdAt') {
+            return (a.createdAt || 0) - (b.createdAt || 0);
+          }
+          // Manual order preserves array index
+          return tasks.findIndex(t => t.id === a.id) - tasks.findIndex(t => t.id === b.id);
+        });
+      };
+
+      const handleMoveTask = (taskId, direction) => {
+        // Force manual ordering when user manually reorders tasks
+        const baseList = getOrderedTasks(sortBy);
+        const idx = baseList.findIndex(t => t.id === taskId);
+        if (idx < 0) return;
+        const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= baseList.length) return;
+
+        // Prevent moving a pending task below a completed task or vice versa
+        if (Boolean(baseList[idx].completed) !== Boolean(baseList[targetIdx].completed)) return;
+
+        const updated = [...baseList];
+        const temp = updated[idx];
+        updated[idx] = updated[targetIdx];
+        updated[targetIdx] = temp;
+
+        if (sortBy !== 'manual') setSortBy('manual');
+        setTasks(updated);
+      };
 
       const handleDragStart = (e, id) => {
         e.dataTransfer.setData('text/plain', String(id));
@@ -6417,13 +6741,18 @@
           setDragOverId(null);
           return;
         }
-        const fromIdx = meetings.findIndex(item => item.id === draggedId);
-        const toIdx = meetings.findIndex(item => item.id === targetId);
+        const baseList = getOrderedTasks(sortBy);
+        const fromIdx = baseList.findIndex(item => item.id === draggedId);
+        const toIdx = baseList.findIndex(item => item.id === targetId);
         if (fromIdx >= 0 && toIdx >= 0) {
-          const updated = [...meetings];
+          const updated = [...baseList];
           const [movedItem] = updated.splice(fromIdx, 1);
           updated.splice(toIdx, 0, movedItem);
-          setMeetings(updated);
+          // Ensure completed tasks still stay at the end of the list
+          const pendingList = updated.filter(t => !t.completed);
+          const completedList = updated.filter(t => Boolean(t.completed));
+          if (sortBy !== 'manual') setSortBy('manual');
+          setTasks([...pendingList, ...completedList]);
         }
         setDraggedId(null);
         setDragOverId(null);
@@ -6434,181 +6763,303 @@
         setDragOverId(null);
       };
 
-      const handleOpenAdd = () => {
-        setFormData({ title: `Claustro nº ${meetings.length + 1}`, date: new Date().toISOString().split('T')[0], time: '17:00', agenda: '1. \n2. \n3. ', agreements: '', notes: '', important: false });
-        setEditingMeeting(null);
-        setShowAdd(true);
-      };
-
-      const handleOpenEdit = (m) => {
-        setFormData({ title: m.title || '', date: m.date || new Date().toISOString().split('T')[0], time: m.time || '', agenda: m.agenda || '', agreements: m.agreements || '', notes: m.notes || '', important: Boolean(m.important) });
-        setEditingMeeting(m);
-        setShowAdd(true);
-      };
-
-      const handleSave = (e) => {
-        e.preventDefault();
-        if (editingMeeting) setMeetings(meetings.map(m => m.id === editingMeeting.id ? { ...m, ...formData } : m));
-        else setMeetings([{ id: `claustro_${Date.now()}`, ...formData }, ...meetings]);
-        setShowAdd(false);
-      };
-
-      const handleDelete = (id) => {
-        if (window.confirm('¿Estás seguro/a de que deseas eliminar este documento de Claustro?')) {
-          setMeetings(meetings.filter(m => m.id !== id));
-        }
-      };
-      const handleToggleImportant = (id) => setMeetings(meetings.map(m => m.id === id ? { ...m, important: !m.important } : m));
-
-      const handleMoveUp = (id) => {
-        const idx = meetings.findIndex(m => m.id === id);
-        if (idx <= 0) return;
-        const updated = [...meetings];
-        const temp = updated[idx];
-        updated[idx] = updated[idx - 1];
-        updated[idx - 1] = temp;
-        setMeetings(updated);
-      };
-
-      const handleMoveDown = (id) => {
-        const idx = meetings.findIndex(m => m.id === id);
-        if (idx < 0 || idx >= meetings.length - 1) return;
-        const updated = [...meetings];
-        const temp = updated[idx];
-        updated[idx] = updated[idx + 1];
-        updated[idx + 1] = temp;
-        setMeetings(updated);
-      };
-
-      const sortedMeetings = [...meetings].sort((a, b) => {
-        if (sortBy === 'dateDesc') return new Date(b.date || 0) - new Date(a.date || 0);
-        if (sortBy === 'dateAsc') return new Date(a.date || 0) - new Date(b.date || 0);
-        return meetings.findIndex(m => m.id === a.id) - meetings.findIndex(m => m.id === b.id);
+      const orderedTasks = getOrderedTasks(sortBy).filter(t => {
+        const c = normalizeCourse(t.course);
+        const matchesCourse = filterCourse === 'TODOS' || c === filterCourse;
+        const q = searchQuery.trim().toLowerCase();
+        const matchesSearch = !q ||
+          (t.subject && t.subject.toLowerCase().includes(q)) ||
+          c.toLowerCase().includes(q) ||
+          (t.date && t.date.includes(q));
+        return matchesCourse && matchesSearch;
       });
+
+      const pendingCount = tasks.filter(t => !t.completed).length;
+      const completedCount = tasks.filter(t => Boolean(t.completed)).length;
 
       return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.25rem' } },
         h('div', { className: 'section-header' },
           h('div', null,
-            h('h2', { className: 'section-title' }, 'Reuniones CLAUSTRO'),
-            h('p', { className: 'section-subtitle' }, 'Sesiones oficiales del Claustro de Profesorado')
+            h('h2', { className: 'section-title' }, '☑️ Flujo de tareas'),
+            h('p', { style: { fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.2rem' } },
+              'Gestión ágil de tareas docentes pendientes por curso, fecha y asunto.'
+            )
           ),
-          h('div', { style: { display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' } },
-            h('select', { className: 'form-control', style: { width: '220px', fontWeight: 600, padding: '0.45rem 0.65rem', background: '#FDF9F0', borderColor: 'var(--gold-accent)' }, value: sortBy, onChange: e => setSortBy(e.target.value) },
-              h('option', { value: 'manual' }, '↕️ Ordenación: Manual'),
-              h('option', { value: 'dateDesc' }, '📅 Reunión: Recientes Primero'),
-              h('option', { value: 'dateAsc' }, '📅 Reunión: Antiguas Primero')
+          h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+            h('span', { className: 'badge badge-gold', style: { fontSize: '0.825rem', padding: '0.35rem 0.75rem' } },
+              `⏳ ${pendingCount} pendiente${pendingCount === 1 ? '' : 's'} · ✅ ${completedCount} realizada${completedCount === 1 ? '' : 's'}`
             ),
-            h('button', { className: 'btn btn-primary', onClick: handleOpenAdd, style: { padding: '0.5rem 1.1rem', fontSize: '0.9rem' } }, '+ CLAUSTRO')
+            completedCount > 0 && h('button', {
+              type: 'button',
+              className: 'btn btn-secondary',
+              onClick: handleClearCompleted,
+              style: { fontSize: '0.8rem', padding: '0.35rem 0.7rem', color: '#DC2626', borderColor: '#FCA5A5' }
+            }, '🗑️ Limpiar realizadas')
           )
         ),
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: '1.15rem' } },
-          sortedMeetings.map(m => {
-            const isDraggingThis = draggedId === m.id;
-            const isOverThis = dragOverId === m.id;
 
-            return h('div', {
-              key: m.id,
-              className: `card ${m.important ? 'is-important' : ''}`,
-              onDragOver: (e) => handleDragOver(e, m.id),
-              onDrop: (e) => handleDrop(e, m.id),
-              onDragEnd: handleDragEnd,
-              style: {
-                borderLeft: '6px solid var(--ink-blue)',
-                padding: '1.25rem',
-                background: isDraggingThis ? '#EFF6FF' : (isOverThis ? '#FEF3C7' : undefined),
-                border: isOverThis ? '2px dashed var(--gold-accent)' : (isDraggingThis ? '1px dashed #3B82F6' : undefined),
-                opacity: isDraggingThis ? 0.5 : 1,
-                transition: 'all 0.15s ease'
+        /* FORMULARIO RÁPIDO PARA AÑADIR NUEVA TAREA */
+        h('form', {
+          onSubmit: handleAddTask,
+          className: 'card',
+          style: {
+            padding: '1.15rem',
+            background: 'linear-gradient(180deg, #FDFCF9 0%, #FFFFFF 100%)',
+            border: '1px solid var(--gold-accent)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.85rem'
+          }
+        },
+          h('div', { style: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--ink-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem' } },
+            '➕ Nueva Tarea Pendiente'
+          ),
+          h('div', { style: { display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' } },
+            h('div', { style: { minWidth: '130px' } },
+              h('label', { className: 'form-label', style: { fontSize: '0.75rem', marginBottom: '0.25rem' } }, 'CURSO'),
+              h('select', {
+                className: 'form-control',
+                style: { fontWeight: 800, ...getCourseBadgeStyle(newCourse) },
+                value: newCourse,
+                onChange: e => setNewCourse(e.target.value)
+              },
+                courses.map(c => h('option', { key: c, value: c, style: { background: '#FFFFFF', color: '#111827', fontWeight: 700 } }, c))
+              )
+            ),
+            h('div', { style: { minWidth: '155px' } },
+              h('label', { className: 'form-label', style: { fontSize: '0.75rem', marginBottom: '0.25rem' } }, 'FECHA'),
+              h('input', {
+                type: 'date',
+                className: 'form-control',
+                style: { fontWeight: 600, background: '#FFFFFF' },
+                value: newDate,
+                onChange: e => setNewDate(e.target.value),
+                required: true
+              })
+            ),
+            h('div', { style: { flex: 1, minWidth: '240px' } },
+              h('label', { className: 'form-label', style: { fontSize: '0.75rem', marginBottom: '0.25rem' } }, 'ASUNTO'),
+              h('input', {
+                type: 'text',
+                className: 'form-control',
+                style: { background: '#FFFFFF' },
+                placeholder: 'Describe la tarea pendiente (ej. Corregir redacciones, Preparar prueba...)...',
+                value: newSubject,
+                onChange: e => setNewSubject(e.target.value),
+                required: true
+              })
+            ),
+            h('button', {
+              type: 'submit',
+              className: 'btn btn-gold',
+              style: { padding: '0.55rem 1.25rem', fontWeight: 700, fontSize: '0.9rem', height: '40px' }
+            }, '+ Añadir Tarea')
+          )
+        ),
+
+        /* BARRA DE FILTROS Y ORDENACIÓN */
+        h('div', { className: 'card', style: { padding: '0.85rem 1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' } },
+          h('div', { style: { display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' } },
+            h('span', { style: { fontSize: '0.775rem', fontWeight: 700, color: 'var(--text-muted)', marginRight: '0.25rem' } }, 'Curso:'),
+            ['TODOS', ...courses].map(c => {
+              const active = filterCourse === c;
+              const cStyle = c === 'TODOS'
+                ? (active ? { background: 'var(--ink-blue)', color: '#FFFFFF', border: '1px solid var(--ink-blue)' } : { background: '#F1F5F9', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' })
+                : getCourseBadgeStyle(c);
+              return h('button', {
+                key: c,
+                type: 'button',
+                onClick: () => setFilterCourse(c),
+                className: 'btn',
+                style: {
+                  padding: '0.25rem 0.65rem',
+                  fontSize: '0.775rem',
+                  fontWeight: 800,
+                  ...cStyle,
+                  opacity: (c !== 'TODOS' && filterCourse !== 'TODOS' && !active) ? 0.45 : 1,
+                  boxShadow: active ? '0 0 0 2px var(--ink-blue)' : 'none',
+                  borderRadius: 'var(--radius-sm)'
+                }
+              }, c);
+            })
+          ),
+          h('div', { style: { display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', flex: 1, justifyContent: 'flex-end', minWidth: '260px' } },
+            h('input', {
+              type: 'text',
+              className: 'form-control',
+              style: { maxWidth: '220px', padding: '0.35rem 0.65rem', fontSize: '0.825rem' },
+              placeholder: '🔍 Filtrar por asunto...',
+              value: searchQuery,
+              onChange: e => setSearchQuery(e.target.value)
+            }),
+            h('select', {
+              className: 'form-control',
+              style: { width: '245px', padding: '0.35rem 0.65rem', fontSize: '0.825rem', fontWeight: 700, background: sortBy === 'manual' ? '#FEF3C7' : '#FDF9F0', borderColor: 'var(--gold-accent)', color: 'var(--ink-blue)' },
+              value: sortBy,
+              onChange: e => {
+                const nextMode = e.target.value;
+                if (nextMode === 'manual') {
+                  // Snapshot current order when switching to manual
+                  setTasks(getOrderedTasks(sortBy));
+                }
+                setSortBy(nextMode);
               }
             },
-              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-subtle)' } },
-                h('div', { style: { display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' } },
+              h('option', { value: 'createdAt' }, '🕒 Orden: Creación (Por defecto)'),
+              h('option', { value: 'manual' }, '↕️ Orden: Manual (Forzar orden)')
+            )
+          )
+        ),
+
+        /* LISTADO DE TAREAS */
+        orderedTasks.length === 0 ? h('div', {
+          className: 'card',
+          style: { padding: '2.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }
+        },
+          h('p', { style: { fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink-blue)' } }, '✨ No hay tareas registradas con este filtro'),
+          h('p', { style: { fontSize: '0.85rem', marginTop: '0.35rem' } }, 'Utiliza el formulario superior para añadir una nueva tarea pendiente.')
+        ) : h('div', { className: 'card', style: { padding: '0.5rem' } },
+          h('div', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', padding: '0.4rem 0.75rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' } },
+            h('span', null, '💡 Puedes editar directamente el curso, la fecha o el asunto de cualquier tarea. Usa ✋ o las flechas ⬆️⬇️ para forzar el orden manual.'),
+            sortBy === 'manual' && h('span', { className: 'badge', style: { background: '#FEF3C7', color: '#92400E', fontWeight: 700 } }, '↕️ Orden manual activo')
+          ),
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.6rem 0.4rem' } },
+            orderedTasks.map((task, idx) => {
+              const isCompleted = Boolean(task.completed);
+              const courseNorm = normalizeCourse(task.course);
+              const isDraggingThis = draggedId === task.id;
+              const isOverThis = dragOverId === task.id;
+
+              return h('div', {
+                key: task.id,
+                onDragOver: e => handleDragOver(e, task.id),
+                onDrop: e => handleDrop(e, task.id),
+                onDragEnd: handleDragEnd,
+                style: {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.65rem',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  background: isCompleted ? '#F8FAFC' : (isOverThis ? '#FEF3C7' : '#FFFFFF'),
+                  border: isOverThis ? '2px dashed var(--gold-accent)' : (isCompleted ? '1px dashed #CBD5E1' : '1px solid var(--border-color)'),
+                  opacity: isDraggingThis ? 0.45 : (isCompleted ? 0.68 : 1),
+                  boxShadow: isCompleted ? 'none' : '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.15s ease',
+                  flexWrap: 'wrap'
+                }
+              },
+                /* CONTROLES DE ORDENACIÓN MANUAL (DRAG + FLECHAS) */
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.15rem' } },
                   h('span', {
                     draggable: true,
-                    onDragStart: (e) => handleDragStart(e, m.id),
-                    style: { cursor: 'grab', userSelect: 'none', color: 'var(--gold-accent)', fontSize: '1.15rem', display: 'flex', alignItems: 'center' },
-                    title: 'Arrastra este icono ✋ para reordenar esta acta de Claustro'
+                    onDragStart: e => handleDragStart(e, task.id),
+                    style: { cursor: 'grab', userSelect: 'none', fontSize: '1.05rem', padding: '0 0.2rem', color: 'var(--gold-accent)' },
+                    title: 'Arrastra para forzar el orden manual'
                   }, '✋'),
-                  h('span', { className: 'badge badge-ink' }, `📅 Fecha: ${formatDateDDMMYYYY(m.date)}${m.time ? ` 🕒 ${m.time} h` : ''}`),
-                  m.important && h('span', { className: 'badge badge-burgundy', style: { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' } }, '⭐ Importante')
-                ),
-                h('div', { style: { display: 'flex', gap: '0.35rem', alignItems: 'center' } },
-                  h('button', { type: 'button', onClick: () => handleToggleImportant(m.id), style: { background: m.important ? '#FEF08A' : 'var(--bg-card-subtle)', border: '1px solid var(--border-color)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '0.85rem' } }, m.important ? '⭐ Importante' : '☆ Marcar Importante'),
-                  sortBy === 'manual' && h(React.Fragment, null,
-                    h('button', { type: 'button', onClick: () => handleMoveUp(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▲'),
-                    h('button', { type: 'button', onClick: () => handleMoveDown(m.id), style: { background: 'var(--bg-card-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0.2rem 0.45rem', cursor: 'pointer', fontSize: '0.75rem' } }, '▼')
-                  ),
-                  h('button', { className: 'btn btn-secondary', onClick: () => handleOpenEdit(m), style: { padding: '0.2rem 0.55rem', fontSize: '0.75rem' } }, '✏️ Editar'),
-                  h(DownloadMenu, { title: m.title, sections: [
-                    { label: '📋 Orden del Día', content: m.agenda },
-                    { label: '✅ Acuerdos Adoptados', content: m.agreements },
-                    { label: '📝 Notas Adicionales', content: m.notes }
-                  ]}),
-                  h('button', { onClick: () => handleDelete(m.id), style: { border: 'none', background: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.55rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 } }, '🗑️ Borrar')
-                )
-              ),
-              h('h3', { style: { fontSize: '1.25rem', color: 'var(--ink-blue)', marginBottom: '0.75rem' } }, m.title),
-              h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', background: 'var(--bg-card-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-                h('div', null,
-                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--ink-blue)', marginBottom: '0.35rem' } }, '📋 Orden del Día'),
-                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agenda) || '<em>Sin especificar</em>' } })
-                ),
-                h('div', null,
-                  h('h4', { style: { fontSize: '0.85rem', color: 'var(--forest-green)', marginBottom: '0.35rem' } }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h('div', { className: 'rte-content', style: { fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500 }, dangerouslySetInnerHTML: { __html: processRteHtml(m.agreements) || '<em>Sin registrar</em>' } })
-                )
-              ),
-              m.notes && h('div', { style: { marginTop: '0.75rem', padding: '0.75rem 1rem', background: '#FFFDF9', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' } },
-                h('h4', { style: { fontSize: '0.825rem', color: 'var(--gold-accent)', marginBottom: '0.25rem' } }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                h('div', { className: 'rte-content', style: { fontSize: '0.85rem', color: 'var(--text-secondary)' }, dangerouslySetInnerHTML: { __html: processRteHtml(m.notes) } })
-              )
-            );
-          })
-        ),
-        showAdd && h('div', { className: 'modal-overlay' },
-          h('div', { className: 'modal-content', style: { maxWidth: '820px' }, onClick: e => e.stopPropagation() },
-            h('div', { className: 'modal-header' },
-              h('h3', { style: { fontSize: '1.2rem', color: 'var(--ink-blue)' } }, editingMeeting ? 'Editar Documento Claustro' : 'Nuevo Documento (+ CLAUSTRO)'),
-              h('button', { onClick: () => setShowAdd(false) }, '✕')
-            ),
-            h('form', { onSubmit: handleSave },
-              h('div', { className: 'modal-body', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-                h('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem' } },
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Título'),
-                    h('input', { className: 'form-control', required: true, value: formData.title, onChange: e => setFormData({ ...formData, title: e.target.value }) })
-                  ),
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Fecha'),
-                    h('input', { type: 'date', className: 'form-control', required: true, value: formData.date, onChange: e => setFormData({ ...formData, date: e.target.value }) })
-                  ),
-                  h('div', { className: 'form-group', style: { marginBottom: 0 } },
-                    h('label', { className: 'form-label' }, 'Hora'),
-                    h('input', { type: 'time', className: 'form-control', value: formData.time || '', onChange: e => setFormData({ ...formData, time: e.target.value }) })
+                  h('div', { style: { display: 'flex', flexDirection: 'column', lineHeight: 1 } },
+                    h('button', {
+                      type: 'button',
+                      onClick: () => handleMoveTask(task.id, 'up'),
+                      disabled: idx === 0 || (isCompleted && !orderedTasks[idx - 1]?.completed),
+                      style: { border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.65rem', padding: '0.05rem 0.15rem', opacity: (idx === 0 || (isCompleted && !orderedTasks[idx - 1]?.completed)) ? 0.25 : 0.85 },
+                      title: 'Subir tarea (activa orden manual)'
+                    }, '▲'),
+                    h('button', {
+                      type: 'button',
+                      onClick: () => handleMoveTask(task.id, 'down'),
+                      disabled: idx === orderedTasks.length - 1 || (!isCompleted && orderedTasks[idx + 1]?.completed),
+                      style: { border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.65rem', padding: '0.05rem 0.15rem', opacity: (idx === orderedTasks.length - 1 || (!isCompleted && orderedTasks[idx + 1]?.completed)) ? 0.25 : 0.85 },
+                      title: 'Bajar tarea (activa orden manual)'
+                    }, '▼')
                   )
                 ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '📋 Orden del Día'),
-                  h(RichTextEditor, { value: formData.agenda, onChange: html => setFormData(p => ({ ...p, agenda: html })), placeholder: 'Puntos del orden del día...' })
+
+                /* RECUADRO PARA MARCAR TAREA REALIZADA */
+                h('label', {
+                  style: { display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 },
+                  title: isCompleted ? 'Desmarcar tarea realizada' : 'Marcar como realizada (se tachará y pasará al final)'
+                },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: isCompleted,
+                    onChange: () => handleToggleComplete(task.id),
+                    style: { width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--forest-green)' }
+                  })
                 ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '✅ Acuerdos Adoptados / Decisiones'),
-                  h(RichTextEditor, { value: formData.agreements, onChange: html => setFormData(p => ({ ...p, agreements: html })), placeholder: 'Acuerdos y decisiones adoptadas...' })
+
+                /* SELECTOR DE CURSO CON INSIGNIA DE COLOR DEL PLANIFICADOR SEMANAL */
+                h('select', {
+                  value: courseNorm,
+                  onChange: e => handleUpdateTaskField(task.id, 'course', e.target.value),
+                  style: {
+                    ...getCourseBadgeStyle(courseNorm),
+                    fontWeight: 800,
+                    fontSize: '0.775rem',
+                    padding: '0.3rem 0.55rem',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    minWidth: '82px',
+                    textAlign: 'center',
+                    textDecoration: isCompleted ? 'line-through' : 'none'
+                  },
+                  title: 'Curso asignado a la tarea'
+                },
+                  courses.map(c => h('option', { key: c, value: c, style: { background: '#FFFFFF', color: '#111827', fontWeight: 700 } }, c))
                 ),
-                h('div', { className: 'form-group' },
-                  h('label', { className: 'form-label' }, '📝 Notas Adicionales / Ruegos y Preguntas'),
-                  h(RichTextEditor, { value: formData.notes, onChange: html => setFormData(p => ({ ...p, notes: html })), placeholder: 'Otras notas y observaciones...' })
-                ),
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)' } },
-                  h('input', { type: 'checkbox', id: 'chk_important_cl', checked: formData.important, onChange: e => setFormData({ ...formData, important: e.target.checked }) }),
-                  h('label', { htmlFor: 'chk_important_cl', style: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--ink-blue)', cursor: 'pointer' } }, '⭐ Marcar este documento como Importante')
-                )
-              ),
-              h('div', { className: 'modal-footer' },
-                h('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setShowAdd(false) }, 'Cancelar'),
-                h('button', { type: 'submit', className: 'btn btn-primary' }, 'Guardar Documento Claustro')
-              )
-            )
+
+                /* CAMPO DE FECHA MODIFICABLE */
+                h('input', {
+                  type: 'date',
+                  className: 'form-control',
+                  value: task.date || todayStr(),
+                  onChange: e => handleUpdateTaskField(task.id, 'date', e.target.value),
+                  style: {
+                    width: '142px',
+                    padding: '0.28rem 0.45rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    color: isCompleted ? 'var(--text-muted)' : 'var(--ink-blue)',
+                    textDecoration: isCompleted ? 'line-through' : 'none',
+                    background: isCompleted ? 'transparent' : '#FDFCF9'
+                  },
+                  title: 'Fecha de la tarea (modificable)'
+                }),
+
+                /* CAMPO DE ASUNTO (TACHADO AUTOMÁTICO AL COMPLETARSE) */
+                h('input', {
+                  type: 'text',
+                  className: 'form-control',
+                  value: task.subject || '',
+                  onChange: e => handleUpdateTaskField(task.id, 'subject', e.target.value),
+                  placeholder: 'Asunto de la tarea...',
+                  style: {
+                    flex: 1,
+                    minWidth: '200px',
+                    border: '1px solid transparent',
+                    background: isCompleted ? 'transparent' : '#FDFCF9',
+                    padding: '0.35rem 0.6rem',
+                    fontSize: '0.925rem',
+                    fontWeight: isCompleted ? 500 : 600,
+                    color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)',
+                    textDecoration: isCompleted ? 'line-through' : 'none'
+                  }
+                }),
+
+                /* ESTADO Y BOTÓN ELIMINAR */
+                isCompleted && h('span', {
+                  className: 'badge',
+                  style: { background: '#DCFCE7', color: '#15803D', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.5rem' }
+                }, '✓ Realizada'),
+
+                h('button', {
+                  type: 'button',
+                  onClick: () => handleDeleteTask(task.id),
+                  style: { border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '1rem', padding: '0.2rem 0.35rem' },
+                  title: 'Eliminar esta tarea'
+                }, '🗑️')
+              );
+            })
           )
         )
       );
@@ -7013,13 +7464,37 @@
       return '';
     }
 
+    function getGroupBadgeStyle(groupName) {
+      if (!groupName || typeof groupName !== 'string') {
+        return { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FB923C' };
+      }
+      const clean = groupName.trim().toUpperCase();
+      if (clean === '4ESO A' || clean === '4A' || clean === '4ª' || clean === '4ºA') {
+        return { background: '#FCE7F3', color: '#9D174D', border: '1px solid #F472B6' };
+      }
+      if (clean === '4ESO C' || clean === '4C' || clean === '4ºC') {
+        return { background: '#FEF9C3', color: '#854D0E', border: '1px solid #FACC15' };
+      }
+      if (clean === 'BAT1 C/G' || clean === 'BAT1' || clean.includes('BAT1')) {
+        return { background: '#CFFAFE', color: '#0E7490', border: '1px solid #06B6D4' };
+      }
+      if (clean === 'LU' || clean.includes('LITERATURA')) {
+        return { background: '#DCFCE7', color: '#15803D', border: '1px solid #4ADE80' };
+      }
+      return { background: '#FFEDD5', color: '#C2410C', border: '1px solid #FB923C' };
+    }
+
     function getGroupBlackShade(groupName) {
       if (!groupName || typeof groupName !== 'string') return '#111827';
       const cleanName = groupName.trim().toUpperCase();
       const predefinedMap = {
         '4ESO A': '#000000',
+        '4A': '#000000',
+        '4ª': '#000000',
         '4ESO C': '#4B5563',
+        '4C': '#4B5563',
         'BAT1 C/G': '#1E293B',
+        'BAT1': '#1E293B',
         '1ESO A': '#64748B',
         '1ESO B': '#111827',
         '2ESO A': '#374151',
@@ -7027,7 +7502,8 @@
         '3ESO A': '#0F172A',
         '3ESO B': '#475569',
         'BAT2 A': '#27272A',
-        'LU': '#6B7280'
+        'LU': '#6B7280',
+        'OTROS': '#334155'
       };
       if (predefinedMap[cleanName]) return predefinedMap[cleanName];
 
@@ -7351,7 +7827,7 @@
                             title: 'Mover hacia abajo'
                           }, '⬇️')
                         ),
-                        subtagLabel && h('span', { className: 'badge', style: { background: getGroupBlackShade(subtagLabel), color: '#FFFFFF', fontWeight: 800, fontSize: '0.75rem', padding: '0.2rem 0.55rem' } }, subtagLabel),
+                        subtagLabel && h('span', { className: 'badge', style: { ...getGroupBadgeStyle(subtagLabel), fontWeight: 800, fontSize: '0.75rem', padding: '0.2rem 0.55rem' } }, subtagLabel),
                         tagLabel && h('span', { className: tagClass, style: { fontSize: '0.725rem', padding: '0.2rem 0.55rem', fontWeight: 700 } }, tagLabel),
                         timeLabel && h('span', { style: { fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 } }, `⏰ ${timeLabel}`)
                       ),
@@ -7764,6 +8240,9 @@
                       dayEvents.map((mEvt, mIdx) => {
                         const groupBadgeLabel = mEvt.subtag ? mEvt.subtag : (getMonthlyTagLabel(mEvt.tag) || 'Evento');
                         const fullTitle = `${mEvt.subtag ? `[${mEvt.subtag}] ` : ''}${mEvt.time ? `${mEvt.time} ` : ''}${mEvt.text || ''}`;
+                        const courseStyle = mEvt.subtag
+                          ? getGroupBadgeStyle(mEvt.subtag)
+                          : { background: 'var(--gold-accent)', color: '#FFFFFF', border: 'none' };
                         return h('span', {
                           key: mEvt.id || mIdx,
                           title: fullTitle,
@@ -7772,8 +8251,7 @@
                             fontWeight: 700,
                             padding: '0.12rem 0.35rem',
                             borderRadius: '4px',
-                            background: mEvt.subtag ? getGroupBlackShade(mEvt.subtag) : 'var(--gold-accent)',
-                            color: '#FFFFFF',
+                            ...courseStyle,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -7809,7 +8287,7 @@
                         }
                       },
                         tagLabel && h('span', { className: tagClass, style: { fontSize: '0.58rem', padding: '0.05rem 0.22rem', flexShrink: 0 } }, tagLabel),
-                        subtagLabel && h('span', { style: { fontSize: '0.58rem', padding: '0.05rem 0.22rem', background: getGroupBlackShade(subtagLabel), color: '#FFF', borderRadius: '3px', fontWeight: 700, flexShrink: 0 } }, subtagLabel),
+                        subtagLabel && h('span', { style: { fontSize: '0.58rem', padding: '0.05rem 0.22rem', ...getGroupBadgeStyle(subtagLabel), borderRadius: '3px', fontWeight: 700, flexShrink: 0 } }, subtagLabel),
                         timeLabel && h('span', { style: { fontSize: '0.6rem', color: 'var(--text-muted)', fontWeight: 700, flexShrink: 0 } }, `⏰ ${timeLabel}`),
                         h('span', { style: { fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 } }, renderTextWithLinks(mEvt.text))
                       );
