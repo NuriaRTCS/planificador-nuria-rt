@@ -2013,7 +2013,11 @@
               h('button', {
                 key: item.id,
                 className: `nav-item ${currentSection === item.id ? 'active' : ''}`,
-                onClick: () => { setCurrentSection(item.id); setIsMobileNavOpen(false); }
+                onClick: () => {
+                  if (item.id === 'weekly') setTargetWeeklyDate(null);
+                  setCurrentSection(item.id);
+                  setIsMobileNavOpen(false);
+                }
               },
                 h('span', null, item.icon),
                 h('span', null, item.label),
@@ -2044,7 +2048,7 @@
                 ),
                 h('div', { className: 'header-actions', style: { display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' } },
                   h('span', { style: { background: 'rgba(255, 255, 255, 0.22)', color: '#FFFFFF', padding: '0.35rem 0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.775rem', fontWeight: 600, backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.3)' } }, autoSyncStatus),
-                  h('button', { className: 'btn btn-outline-white', onClick: () => setCurrentSection('weekly') }, 'Ir a esta Semana')
+                  h('button', { className: 'btn btn-outline-white', onClick: () => { setTargetWeeklyDate(null); setCurrentSection('weekly'); } }, 'Ir a esta Semana')
                 )
               )
             ),
@@ -2061,7 +2065,7 @@
     }
 
     // --- HOME VIEW ("INICIO") ---
-    function HomeView({ setCurrentSection, data, setData }) {
+    function HomeView({ setCurrentSection, data, setData, onGoToWeeklyPlanner }) {
       const today = new Date();
       const schoolStartStr = '2026-09-09';
       const schoolEndStr = '2027-06-18';
@@ -2307,7 +2311,14 @@
                     return h('div', {
                       key: dateStr,
                       className: `month-day-cell ${isToday ? 'today' : ''} ${calTagClass}`,
-                      onClick: () => setSelectedDateForNotes(dateStr),
+                      onClick: () => {
+                        if (onGoToWeeklyPlanner) {
+                          onGoToWeeklyPlanner(dateStr);
+                        } else {
+                          setCurrentSection('weekly');
+                        }
+                      },
+                      title: `Ir al Planificador Semanal (${formatDateDDMMYYYY(dateStr)})`,
                       style: {
                         minHeight: '62px',
                         padding: isWeekend ? '0.15rem 0.1rem' : '0.2rem 0.15rem',
@@ -3192,16 +3203,25 @@
       const today = new Date();
       const defaultMonday = getMondayOfDate(today);
 
+      const getWeekdayKeyFromDateStr = (dStr) => {
+        if (!dStr) return null;
+        const dObj = new Date(`${dStr}T12:00:00`);
+        const map = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const key = map[dObj.getDay()];
+        return ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].includes(key) ? key : null;
+      };
+
       const [currentMondayStr, setCurrentMondayStr] = useState(() => {
         if (targetDate) return getMondayOfDate(new Date(targetDate));
         return defaultMonday;
       });
       const [selectedSlotTarget, setSelectedSlotTarget] = useState(null);
-      const [expandedDayKey, setExpandedDayKey] = useState(null);
+      const [expandedDayKey, setExpandedDayKey] = useState(() => getWeekdayKeyFromDateStr(targetDate));
 
       useEffect(() => {
         if (targetDate) {
           setCurrentMondayStr(getMondayOfDate(new Date(targetDate)));
+          setExpandedDayKey(getWeekdayKeyFromDateStr(targetDate));
         }
       }, [targetDate]);
 
@@ -3302,11 +3322,16 @@
               tagBadge = h('span', { className: 'badge', style: { background: 'var(--tag-claustro-bg)', color: 'var(--tag-claustro-text)', fontSize: '0.625rem', padding: '0.15rem 0.4rem', fontWeight: 700 } }, '🎓 Claustro');
             }
 
+            const isTargetDay = Boolean(targetDate && dayDateISO === targetDate);
+            if (isTargetDay && isProgrammableDay) {
+              cardBorder = '2px solid var(--gold-accent)';
+            }
+
             return h('div', {
               key: d.key,
               className: 'card',
               onClick: () => {
-                if (isProgrammableDay) setSelectedDayKey(d.key);
+                if (isProgrammableDay) setExpandedDayKey(d.key);
               },
               style: {
                 cursor: isProgrammableDay ? 'pointer' : (isNonSchoolDay ? 'not-allowed' : 'default'),
@@ -3317,6 +3342,7 @@
                 minHeight: '520px',
                 background: cardBackground,
                 border: cardBorder,
+                boxShadow: isTargetDay ? '0 0 0 3px rgba(196, 154, 69, 0.22)' : undefined,
                 opacity: isWithinSchoolYear ? 1 : 0.65
               }
             },
