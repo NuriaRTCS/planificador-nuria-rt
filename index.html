@@ -6638,6 +6638,44 @@
 
       const [draggedId, setDraggedId] = useState(null);
       const [dragOverId, setDragOverId] = useState(null);
+      const [editingSubjectId, setEditingSubjectId] = useState(null);
+
+      const buildTextWithPromptedLink = (currentText = '') => {
+        const cleanCurrent = (currentText || '').trim();
+        const urlInput = window.prompt(
+          '🔗 Insertar Enlace Web en Asunto\n\n1. Pega la dirección URL (Drive, YouTube, Canva, web...):',
+          'https://'
+        );
+        if (!urlInput || urlInput.trim() === '' || urlInput.trim() === 'https://') return null;
+        let cleanUrl = urlInput.trim();
+        if (!/^https?:\/\//i.test(cleanUrl)) {
+          cleanUrl = 'https://' + cleanUrl;
+        }
+        const defaultLabel = cleanCurrent ? cleanCurrent : 'Ver enlace';
+        const labelInput = window.prompt(
+          '📝 Texto visible que tendrá el enlace:\n(Ej: Ficha de lectura, Documento Drive, Rúbrica...)',
+          defaultLabel
+        );
+        const displayLabel = (labelInput && labelInput.trim()) ? labelInput.trim() : cleanUrl;
+        const markdownLink = `[${displayLabel}](${cleanUrl})`;
+
+        if (!cleanCurrent) return markdownLink;
+        if (cleanCurrent === displayLabel) return markdownLink;
+        if (cleanCurrent.includes(displayLabel)) return cleanCurrent.replace(displayLabel, markdownLink);
+        return `${cleanCurrent} ${markdownLink}`;
+      };
+
+      const handleInsertLinkNewSubject = () => {
+        const updated = buildTextWithPromptedLink(newSubject);
+        if (updated !== null) setNewSubject(updated);
+      };
+
+      const handleInsertLinkTask = (task) => {
+        const updated = buildTextWithPromptedLink(task.subject || '');
+        if (updated !== null) {
+          handleUpdateTaskField(task.id, 'subject', updated);
+        }
+      };
 
       const normalizeCourse = (c) => {
         if (!c) return 'OTROS';
@@ -6867,12 +6905,29 @@
               })
             ),
             h('div', { style: { flex: 1, minWidth: '240px' } },
-              h('label', { className: 'form-label', style: { fontSize: '0.75rem', marginBottom: '0.25rem' } }, 'ASUNTO'),
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' } },
+                h('label', { className: 'form-label', style: { fontSize: '0.75rem', marginBottom: 0 } }, 'ASUNTO'),
+                h('button', {
+                  type: 'button',
+                  onClick: handleInsertLinkNewSubject,
+                  style: {
+                    background: '#EFF6FF',
+                    color: '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                    borderRadius: '4px',
+                    padding: '0.1rem 0.45rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  },
+                  title: 'Insertar un enlace web en el asunto'
+                }, '🔗 Insertar enlace web')
+              ),
               h('input', {
                 type: 'text',
                 className: 'form-control',
                 style: { background: '#FFFFFF' },
-                placeholder: 'Describe la tarea pendiente (ej. Corregir redacciones, Preparar prueba...)...',
+                placeholder: 'Describe la tarea o pega/inserta un enlace web...',
                 value: newSubject,
                 onChange: e => setNewSubject(e.target.value),
                 required: true
@@ -7055,25 +7110,67 @@
                   title: 'Fecha de la tarea (modificable)'
                 }),
 
-                /* CAMPO DE ASUNTO (TACHADO AUTOMÁTICO AL COMPLETARSE) */
-                h('input', {
+                /* CAMPO DE ASUNTO CON SOPORTE DE ENLACES WEB Y TACHADO AUTOMÁTICO */
+                editingSubjectId === task.id ? h('input', {
                   type: 'text',
                   className: 'form-control',
+                  autoFocus: true,
                   value: task.subject || '',
                   onChange: e => handleUpdateTaskField(task.id, 'subject', e.target.value),
+                  onBlur: () => setEditingSubjectId(null),
+                  onKeyDown: e => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      e.preventDefault();
+                      setEditingSubjectId(null);
+                    }
+                  },
                   placeholder: 'Asunto de la tarea...',
                   style: {
                     flex: 1,
                     minWidth: '200px',
+                    border: '1px solid var(--gold-accent)',
+                    background: '#FFFFFF',
+                    padding: '0.35rem 0.6rem',
+                    fontSize: '0.925rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)'
+                  }
+                }) : h('div', {
+                  onClick: () => setEditingSubjectId(task.id),
+                  title: 'Haz clic para editar el texto del asunto (o pulsa sobre el enlace 🔗 para abrirlo)',
+                  style: {
+                    flex: 1,
+                    minWidth: '200px',
                     border: '1px solid transparent',
+                    borderRadius: 'var(--radius-sm)',
                     background: isCompleted ? 'transparent' : '#FDFCF9',
                     padding: '0.35rem 0.6rem',
                     fontSize: '0.925rem',
                     fontWeight: isCompleted ? 500 : 600,
                     color: isCompleted ? 'var(--text-muted)' : 'var(--text-primary)',
-                    textDecoration: isCompleted ? 'line-through' : 'none'
+                    textDecoration: isCompleted ? 'line-through' : 'none',
+                    cursor: 'text',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere'
                   }
-                }),
+                }, task.subject ? renderTextWithLinks(task.subject, isCompleted ? { color: 'var(--text-muted)', textDecoration: 'line-through' } : {}) : h('span', { style: { color: 'var(--text-muted)', fontStyle: 'italic' } }, 'Sin asunto (clic para escribir)...')),
+
+                /* BOTÓN PARA AÑADIR / INSERTAR ENLACE WEB EN LA TAREA */
+                h('button', {
+                  type: 'button',
+                  onClick: () => handleInsertLinkTask(task),
+                  style: {
+                    border: '1px solid #BFDBFE',
+                    background: '#EFF6FF',
+                    color: '#1D4ED8',
+                    borderRadius: 'var(--radius-sm)',
+                    cursor: 'pointer',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    padding: '0.22rem 0.45rem'
+                  },
+                  title: 'Insertar o añadir un enlace web a este asunto'
+                }, '🔗'),
 
                 /* ESTADO Y BOTÓN ELIMINAR */
                 isCompleted && h('span', {
